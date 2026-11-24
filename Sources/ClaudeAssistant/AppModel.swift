@@ -39,10 +39,19 @@ final class AppModel {
     /// Cost and count of today's runs, from the log.
     private(set) var today: (costUSD: Double, runs: Int) = (0, 0)
 
-    init(log: RunLog = RunLog()) {
+    // Dismissed items
+    private let dismissStore: DismissStore
+    /// Items the owner is done with. Hidden on the page; the generator leaves
+    /// them out of the next one.
+    private(set) var dismissed: [DismissedItem] = []
+    var dismissedKeys: [String] { dismissed.map(\.key) }
+
+    init(log: RunLog = RunLog(), dismissStore: DismissStore = DismissStore()) {
         self.log = log
+        self.dismissStore = dismissStore
         loadPage()
         today = log.total()
+        dismissed = dismissStore.load()
     }
 
     // MARK: Page
@@ -176,6 +185,25 @@ final class AppModel {
 
     func cancelAsk() {
         askRunner.stop()
+    }
+
+    // MARK: Dismissed items
+
+    /// Called from the page when the owner presses an item's "done" button.
+    func dismiss(_ item: DismissedItem) {
+        dismissed = dismissStore.add(item)
+    }
+
+    /// Called from the page when a dismissed item is put back.
+    func restore(key: String) {
+        dismissed = dismissStore.remove(key: key)
+    }
+
+    /// Empties the list and shows every item again.
+    func forgetDismissed() {
+        dismissStore.removeAll()
+        dismissed = []
+        reloadToken += 1
     }
 
     // MARK: Cost
