@@ -5,7 +5,8 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
 - **Layout.** Swift package, one executable target `ClaudeAssistant`, macOS 14+,
   SwiftUI with `@Observable`. `Scripts/make_app.sh` builds the release binary
   and wraps it as `ClaudeAssistant.app` (display name "Briefing", bundle id
-  `local.jeffdekerj.claude-assistant`). Same shape as `finance-update-ui`.
+  `local.jeffdekerj.claude-assistant`, icon from `Resources/AppIcon.icns`,
+  signed with the Mac's stable local identity). Same shape as `finance-update-ui`.
 - **Page choice** (`BriefingPage.swift`): today's `briefings/YYYY-MM-DD.html` in
   Europe/London, else the newest file whose stem is a date, else an empty page
   that says to press Refresh. Files with other names are ignored, so backups
