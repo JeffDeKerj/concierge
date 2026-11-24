@@ -33,9 +33,6 @@ Traps and non-obvious constraints, one bullet each.
   again. If the scheduled run produced a good page and the headless run has
   fewer sources, Refresh replaces the better page with the poorer one. Copy the
   page to a non-date name first if it matters (the locator ignores such files).
-- **Window owner name is "Briefing", not "ClaudeAssistant".** Anything that
-  finds the window by owner (`CGWindowListCopyWindowInfo`, `screencapture -l`)
-  must use the display name from `Info.plist`.
 - **No scripting without Accessibility.** `osascript` System Events calls fail
   with "not allowed assistive access" from Claude's shell. To photograph the
   app, find the window id with CoreGraphics and use `screencapture -x -l <id>`;
@@ -52,7 +49,7 @@ Traps and non-obvious constraints, one bullet each.
   moment the WhatsApp server opened the database (2026-11-24 09:30). macOS
   charges the whole process tree to the app that started it, so granting `uv`
   or `claude` does nothing for in-app runs. Full Disk Access covers App Data
-  and is the grant to give `~/Applications/ClaudeAssistant.app`. A run from
+  and is the grant to give `~/Applications/Concierge.app`. A run from
   the Terminal works because the Terminal already has it.
 - **Grants on bare CLI binaries do not last.** The owner added `uv` to the
   privacy settings a few days ago and the entry vanished, with no macOS

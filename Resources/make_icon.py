@@ -1,6 +1,6 @@
 """
-Draw the app icon: a dark squircle in the briefing page's own colours, a sun
-rising over a horizon, and three lines of text under it.
+Draw the app icon: a dark squircle in the briefing page's own colours with a
+concierge's desk bell on it, ringing.
 
 Produces Resources/AppIcon.png (1024 master), Resources/AppIcon.iconset/ and
 Resources/AppIcon.icns. Run with a Python that has Pillow:
@@ -72,40 +72,51 @@ def glow(size: int, center, radius: int, color, alpha: int) -> Image.Image:
 def make_master() -> Image.Image:
     img = vertical_gradient(SIZE, BG_TOP, BG_BOTTOM).convert("RGBA")
 
-    horizon = int(SIZE * 0.56)
     cx = SIZE // 2
-    sun_r = int(SIZE * 0.21)
+    base_y = int(SIZE * 0.70)          # where the dome meets the plate
+    dome_r = int(SIZE * 0.27)
 
-    # Warm glow behind the sun, then the sun itself, cut at the horizon.
-    img = Image.alpha_composite(img, glow(SIZE, (cx, horizon - sun_r * 0.2), int(sun_r * 1.9), WARM, 70))
-    img = Image.alpha_composite(img, glow(SIZE, (cx, horizon - sun_r * 0.3), int(sun_r * 1.3), SUN_A, 110))
-    sun = diagonal_gradient_disc(SIZE, (cx - sun_r, horizon - sun_r - int(sun_r * 0.15), cx + sun_r, horizon + sun_r - int(sun_r * 0.15)), SUN_A, SUN_B)
+    # Soft warm glow behind the bell.
+    img = Image.alpha_composite(img, glow(SIZE, (cx, base_y - dome_r * 0.5), int(dome_r * 1.5), WARM, 60))
+    img = Image.alpha_composite(img, glow(SIZE, (cx, base_y - dome_r * 0.4), int(dome_r * 1.1), SUN_A, 90))
+
+    # Dome: a gradient disc cut at the plate line.
+    dome = diagonal_gradient_disc(SIZE, (cx - dome_r, base_y - dome_r, cx + dome_r, base_y + dome_r), SUN_A, SUN_B)
     cut = Image.new("L", (SIZE, SIZE), 255)
-    ImageDraw.Draw(cut).rectangle((0, horizon, SIZE, SIZE), fill=0)
-    sun.putalpha(Image.composite(sun.getchannel("A"), Image.new("L", (SIZE, SIZE), 0), cut))
-    img = Image.alpha_composite(img, sun)
+    ImageDraw.Draw(cut).rectangle((0, base_y, SIZE, SIZE), fill=0)
+    dome.putalpha(Image.composite(dome.getchannel("A"), Image.new("L", (SIZE, SIZE), 0), cut))
+    img = Image.alpha_composite(img, dome)
 
     d = ImageDraw.Draw(img)
-    # Rays: short bars fanned over the sun.
-    for deg in (-60, -30, 0, 30, 60):
-        a = math.radians(-90 + deg)
-        r0, r1 = sun_r * 1.28, sun_r * 1.55
-        x0, y0 = cx + r0 * math.cos(a), (horizon - sun_r * 0.15) + r0 * math.sin(a)
-        x1, y1 = cx + r1 * math.cos(a), (horizon - sun_r * 0.15) + r1 * math.sin(a)
-        d.line((x0, y0, x1, y1), fill=(*WARM, 220), width=int(SIZE * 0.022))
+    # Highlight on the dome.
+    hl = int(dome_r * 0.62)
+    d.arc((cx - hl, base_y - hl - int(dome_r * 0.12), cx + hl, base_y + hl - int(dome_r * 0.12)),
+          start=200, end=245, fill=(255, 255, 255, 150), width=int(SIZE * 0.022))
 
-    # Horizon line.
-    d.line((int(SIZE * 0.17), horizon, int(SIZE * 0.83), horizon), fill=(*LINE, 255), width=int(SIZE * 0.014))
+    # Stem and button on top.
+    top = base_y - dome_r
+    stem_w, stem_h = int(SIZE * 0.035), int(SIZE * 0.05)
+    d.rectangle((cx - stem_w // 2, top - stem_h, cx + stem_w // 2, top + 4), fill=(*LINE, 255))
+    btn_w, btn_h = int(SIZE * 0.11), int(SIZE * 0.035)
+    d.rounded_rectangle((cx - btn_w // 2, top - stem_h - btn_h, cx + btn_w // 2, top - stem_h + 2),
+                        radius=btn_h // 2, fill=(*LINE, 255))
 
-    # Three lines of the briefing, left-aligned, shorter each time.
-    left = int(SIZE * 0.2)
-    y = horizon + int(SIZE * 0.08)
-    gap = int(SIZE * 0.075)
-    widths = (0.6, 0.45, 0.3)
-    for i, w in enumerate(widths):
-        colour = LINE if i == 0 else LINE_FAINT
-        d.rounded_rectangle((left, y, left + int(SIZE * w), y + int(SIZE * 0.032)), radius=int(SIZE * 0.016), fill=(*colour, 255))
-        y += gap
+    # Plate under the dome.
+    plate_w, plate_h = int(SIZE * 0.66), int(SIZE * 0.06)
+    d.rounded_rectangle((cx - plate_w // 2, base_y - 2, cx + plate_w // 2, base_y + plate_h),
+                        radius=plate_h // 2, fill=(*LINE, 255))
+    d.rounded_rectangle((cx - plate_w // 2 + 20, base_y + plate_h - 6, cx + plate_w // 2 - 20, base_y + plate_h + int(SIZE * 0.02)),
+                        radius=8, fill=(*LINE_FAINT, 255))
+
+    # Ring marks: three short warm strokes either side of the button.
+    ring_cy = top - stem_h - btn_h // 2
+    for side in (-1, 1):
+        for deg in (-35, 0, 35):
+            a = math.radians(deg)
+            r0, r1 = SIZE * 0.10, SIZE * 0.16
+            x0 = cx + side * r0 * math.cos(a); y0 = ring_cy + r0 * math.sin(a) - SIZE * 0.02
+            x1 = cx + side * r1 * math.cos(a); y1 = ring_cy + r1 * math.sin(a) - SIZE * 0.02
+            d.line((x0, y0, x1, y1), fill=(*WARM, 230), width=int(SIZE * 0.022))
 
     img.putalpha(squircle_mask(SIZE))
     return img

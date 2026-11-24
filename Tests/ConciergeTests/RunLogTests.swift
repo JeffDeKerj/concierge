@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import ClaudeAssistant
+@testable import Concierge
 
 struct RunLogTests {
     @Test func appendsAndTotalsToday() throws {

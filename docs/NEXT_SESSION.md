@@ -1,7 +1,7 @@
 # NEXT_SESSION
 
-Main tip `1fa68ec`. Remote `origin` is
-`git@github.com:JeffDeKerj/claude-assistant.git`. The app opens on today's
+Main tip `1fa68ec`. Renamed from claude-assistant to **Concierge** on 2026-11-24 (folder, app, bundle id, env vars, icon; see the session log 2026-11-24d). Remote `origin` is
+`git@github.com:JeffDeKerj/concierge.git`. The app opens on today's
 briefing page (or the newest, with a notice), rebuilds it headless from a
 Refresh button, answers follow-up questions under it, and shows what every run
 cost. Since the last handoff it has a "×" on every item that keeps the item off

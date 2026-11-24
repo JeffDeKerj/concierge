@@ -7,7 +7,7 @@
 #   fail    exit 1 with an error line, like a logged-out CLI
 #   denied  answer, but report a refused tool
 # Answers are in Claude's `--output-format json` shape, with a fixed cost.
-dir="${CLAUDE_ASSISTANT_DIR:-$PWD}"
+dir="${CONCIERGE_DIR:-$PWD}"
 mode=$(cat "$dir/stub-mode" 2>/dev/null || echo echo)
 
 answer() { # $1 = result text, $2 = extra JSON fields (optional)

@@ -6,7 +6,7 @@ import Foundation
 struct CodexBackend: AgentBackend {
     let id = "codex"
     let displayName = "Codex"
-    let binaryOverrideVariable = "CLAUDE_ASSISTANT_CODEX_BIN"
+    let binaryOverrideVariable = "CONCIERGE_CODEX_BIN"
     let executableCandidates = [
         "/opt/homebrew/bin/codex",
         "/usr/local/bin/codex",

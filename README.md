@@ -1,4 +1,4 @@
-# Claude Assistant
+# Concierge
 
 A small macOS app that opens on the morning briefing page. The page itself is
 built by the `briefing` skill in Claude Code (`~/.claude/skills/briefing/`),
@@ -33,7 +33,7 @@ The app:
 The Agent menu picks the CLI behind Refresh and the follow-up: Claude Code
 (the default, checked end to end), Antigravity (`agy`, its JSON checked) or
 Codex (`codex exec`, not yet checked). Each is one file in
-`Sources/ClaudeAssistant/` implementing `AgentBackend`: where its binary is,
+`Sources/Concierge/` implementing `AgentBackend`: where its binary is,
 which arguments build the page or ask a question, and how to read its output.
 Adding another tool means adding one such file and listing it in
 `AgentBackends.all`. Only Claude has the `/briefing` skill as a command; the
@@ -56,21 +56,21 @@ update; the scripts source `Scripts/swift-build-flags.sh`, which pins the
 working SDK.
 
 ```bash
-./Scripts/make_app.sh       # release build, then ClaudeAssistant.app
-open ClaudeAssistant.app
+./Scripts/make_app.sh       # release build, then Concierge.app
+open Concierge.app
 ./Scripts/test.sh           # Swift Testing, against a stub claude
 ```
 
-`open ClaudeAssistant.app --args --refresh` starts a Refresh at launch.
+`open Concierge.app --args --refresh` starts a Refresh at launch.
 
 Environment overrides, for tests and scripted runs:
 
 | Variable | Meaning |
 | --- | --- |
-| `CLAUDE_ASSISTANT_DIR` | the project folder to use instead of this one |
-| `CLAUDE_ASSISTANT_CLAUDE_BIN` | the `claude` binary to run instead of the installed one |
-| `CLAUDE_ASSISTANT_AGY_BIN`, `CLAUDE_ASSISTANT_CODEX_BIN` | the same for the other agents |
-| `CLAUDE_ASSISTANT_AGENT` | `claude`, `antigravity` or `codex`, overriding the Agent menu |
+| `CONCIERGE_DIR` | the project folder to use instead of this one |
+| `CONCIERGE_CLAUDE_BIN` | the `claude` binary to run instead of the installed one |
+| `CONCIERGE_AGY_BIN`, `CONCIERGE_CODEX_BIN` | the same for the other agents |
+| `CONCIERGE_AGENT` | `claude`, `antigravity` or `codex`, overriding the Agent menu |
 
 ## Handoff
 
