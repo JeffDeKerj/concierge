@@ -1,12 +1,12 @@
 # NEXT_SESSION
 
-Main tip `a4f9510`. Remote `origin` is
+Main tip `8a91d27`. Remote `origin` is
 `git@github.com:JeffDeKerj/claude-assistant.git`. Version 1 landed in `a4f9510` from
-branch `app-v1`. It opens on today's briefing
+branch `app-v1`, and the headless work in `8a91d27` from branch `headless-refresh-cost`. It opens on today's briefing
 page, falls back to the newest page with a notice, runs the generator headless
 from a Refresh button and reloads when the file changes, and sends a follow-up
-question to `claude -p --continue`. Branch `headless-refresh-cost` (unmerged)
-adds the project allow-list that makes headless runs work, a cost and token
+question to `claude -p --continue`. The second change
+added the project allow-list that makes headless runs work, a cost and token
 readout for every run, and an `AgentBackend` seam with Claude, Antigravity and
 Codex behind an Agent menu, an icon, and stable code signing so the app's Full
 Disk Access grant (needed for WhatsApp) survives rebuilds. Nineteen tests pass
