@@ -1,44 +1,38 @@
 import Foundation
 
-enum ClaudeError: LocalizedError {
-    case missingExecutable
-    case failed(status: Int32, output: String)
-    case cancelled
+enum AgentError: LocalizedError {
+    case missingExecutable(String)
 
     var errorDescription: String? {
         switch self {
-        case .missingExecutable:
-            return "The claude command was not found. Install Claude Code or set CLAUDE_ASSISTANT_CLAUDE_BIN."
-        case .failed(let status, let output):
-            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            return "claude exited with status \(status)." + (detail.isEmpty ? "" : "\n\(detail)")
-        case .cancelled:
-            return "Cancelled."
+        case .missingExecutable(let name):
+            return "The \(name) command was not found. Install it, or point the app at it with its environment variable."
         }
     }
 }
 
-struct ClaudeOutput {
+struct ProcessOutput {
     let status: Int32
     let stdout: String
     let stderr: String
-    var text: String { stdout.trimmingCharacters(in: .whitespacesAndNewlines) }
     var combined: String { (stdout + "\n" + stderr).trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
-/// One headless `claude -p …` run in the project folder. Keeps the process so
-/// the caller can stop it.
-final class ClaudeRunner {
+/// One headless run of the chosen agent in the project folder. Keeps the
+/// process so the caller can stop it.
+final class AgentRunner {
     private var process: Process?
 
-    /// Run `claude` with `arguments`, the project as working directory. Throws
-    /// when the binary is missing; a non-zero exit is returned, not thrown, so
-    /// callers can read the message.
-    func run(arguments: [String]) async throws -> ClaudeOutput {
-        guard let claude = ToolLookup.claude else { throw ClaudeError.missingExecutable }
+    /// Run the backend's binary with `arguments`, the project as working
+    /// directory. Throws only when the binary is missing; a non-zero exit is
+    /// returned so the backend can read the message.
+    func run(_ backend: AgentBackend, arguments: [String]) async throws -> ProcessOutput {
+        guard let executable = backend.executable else {
+            throw AgentError.missingExecutable(backend.displayName)
+        }
 
         let process = Process()
-        process.executableURL = claude
+        process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = Paths.project
 
@@ -76,7 +70,7 @@ final class ClaudeRunner {
 
         let stdout = String(data: await outTask.value, encoding: .utf8) ?? ""
         let stderr = String(data: await errTask.value, encoding: .utf8) ?? ""
-        return ClaudeOutput(status: process.terminationStatus, stdout: stdout, stderr: stderr)
+        return ProcessOutput(status: process.terminationStatus, stdout: stdout, stderr: stderr)
     }
 
     func stop() {

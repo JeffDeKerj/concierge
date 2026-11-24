@@ -6,15 +6,18 @@ Traps and non-obvious constraints, one bullet each.
   2026-09-10 Command Line Tools update; always go through
   `Scripts/swift-build-flags.sh` (`make_app.sh` and `test.sh` already do). There
   is no XCTest in the Command Line Tools; tests are Swift Testing.
-- **The CLI must be logged in.** The app runs the standalone `~/.local/bin/claude`
-  (2.1.284 on 2026-11-24). `claude auth status` reported `loggedIn: false`, and
-  the desktop app's bundled copy was logged out too. A logged-out CLI makes both
-  Refresh and the follow-up fail with an authentication line in red. Nothing in
-  the app can fix that; the owner logs in once in a terminal.
-- **Headless runs do not see the desktop app's connectors.** Gmail and Google
-  Calendar are claude.ai connectors injected by the desktop app; `claude mcp list`
-  from a shell does not show them. A Refresh from the app writes a page with
-  those sources marked down. See pick 2 in [NEXT_SESSION.md](NEXT_SESSION.md).
+- **The CLI must be logged in.** The app runs the standalone `~/.local/bin/claude`.
+  Logged out, both Refresh and the follow-up fail with an authentication line
+  in red; `claude auth login` in a terminal fixes it. Logged in, the CLI also
+  sees the claude.ai Gmail and Google Calendar connectors (as
+  `mcp__claude_ai_Gmail__…` and `mcp__claude_ai_Google_Calendar__…`); logged
+  out, `claude mcp list` does not show them at all.
+- **Permissions need a trusted folder.** `.claude/settings.json` is ignored,
+  with a stderr warning, until the folder is trusted in `~/.claude.json`. In
+  print mode a refused tool is a silent denial: the run "succeeds" with no
+  page. The app now lists refused tools from the JSON `permission_denials`.
+- **agy's `status` is upper-case** (`"SUCCESS"`); compare it case-insensitively.
+  Its duration is `duration_seconds`, not milliseconds, and it reports no price.
 - **Refresh overwrites today's page.** The skill writes the same date's file
   again. If the scheduled run produced a good page and the headless run has
   fewer sources, Refresh replaces the better page with the poorer one. Copy the
@@ -31,3 +34,13 @@ Traps and non-obvious constraints, one bullet each.
   under `SerialTests`, which carries `.serialized`.
 - **`open … --args` reaches only a fresh launch.** If the app is already running,
   `open` brings it forward and drops the arguments and environment. Quit first.
+- **WhatsApp needs Full Disk Access for the app.** The chat database is under
+  `~/Library/Group Containers`, protected by macOS. A run from the Terminal
+  works because the Terminal has the grant; a run from the app does not until
+  `ClaudeAssistant.app` has it, since macOS charges a process tree to the app
+  that started it. Granting `uv` or `claude` does nothing for in-app runs.
+- **Rebuilds and privacy grants.** Full Disk Access is keyed to the code
+  identity. `make_app.sh` signs with the stable local identity "Finance
+  Advisor Dev" (shared with the sibling apps) so a grant survives rebuilds; an
+  ad-hoc build is a new app to macOS every time. `Scripts/make_signing_cert.sh`
+  creates the identity if it is ever missing.

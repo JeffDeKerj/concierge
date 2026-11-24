@@ -10,6 +10,7 @@ enum Fixture {
         try? FileManager.default.removeItem(at: briefings)
         try FileManager.default.createDirectory(at: briefings, withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: project.appendingPathComponent("stub-mode"))
+        UserDefaults.standard.removeObject(forKey: AgentBackends.settingsKey)
     }
 
     static func stubMode(_ mode: String) throws {

@@ -21,6 +21,21 @@ struct ClaudeAssistantApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandMenu("Agent") {
+                Picker("Agent", selection: Binding(
+                    get: { model.backendID },
+                    set: { model.backendID = $0 })) {
+                    ForEach(AgentBackends.all, id: \.id) { backend in
+                        Text(backend.displayName).tag(backend.id)
+                    }
+                }
+                .pickerStyle(.inline)
+                .disabled(model.isRefreshing || model.isAsking)
+                Divider()
+                Button("Reveal Run Log in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([Paths.briefings.appendingPathComponent("runs.jsonl")])
+                }
+            }
             CommandGroup(after: .toolbar) {
                 Button("Refresh Briefing") { model.refresh() }
                     .keyboardShortcut("r", modifiers: .command)

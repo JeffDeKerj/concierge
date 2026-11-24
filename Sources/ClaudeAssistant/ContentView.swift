@@ -17,20 +17,26 @@ struct ContentView: View {
                     .accessibilityIdentifier("notice")
             }
             if let error = model.refreshError {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .accessibilityIdentifier("refreshError")
+                // Capped: a generator that explains itself at length must not
+                // push the page off the window.
+                ScrollView {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                }
+                .frame(maxHeight: 140)
+                .accessibilityIdentifier("refreshError")
             }
 
             BriefingWebView(page: model.page, reloadToken: model.reloadToken)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
+            CostLine()
             FollowUpPanel()
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
@@ -78,6 +84,41 @@ struct ContentView: View {
             if CommandLine.arguments.contains("--refresh") {
                 model.refresh()
             }
+        }
+    }
+}
+
+/// What the last Refresh and the last follow-up cost, and today's total.
+/// Prices are API prices: on a subscription nothing is billed, but this is
+/// what the run would have cost.
+struct CostLine: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let refresh = model.lastRefresh?.summary ?? ""
+        let ask = model.lastAsk?.summary ?? ""
+        if !refresh.isEmpty || !ask.isEmpty || model.today.runs > 0 {
+            VStack(alignment: .leading, spacing: 2) {
+                if !refresh.isEmpty {
+                    Text("Refresh: \(refresh)")
+                        .accessibilityIdentifier("cost.refresh")
+                }
+                if !ask.isEmpty {
+                    Text("Reply: \(ask)")
+                        .accessibilityIdentifier("cost.ask")
+                }
+                if model.today.runs > 0 {
+                    Text("Today: \(String(format: "$%.2f", model.today.costUSD)) over \(model.today.runs) \(model.today.runs == 1 ? "run" : "runs") · \(model.backend.displayName)")
+                        .accessibilityIdentifier("cost.today")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .help("API prices for the runs. On a subscription nothing is billed; this is what the same calls would cost.")
         }
     }
 }
