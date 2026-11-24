@@ -64,6 +64,10 @@ final class AppModel {
     /// Items the owner is done with. Hidden on the page; the generator leaves
     /// them out of the next one.
     private(set) var dismissed: [DismissedItem] = []
+    /// What the daytime jobs found today, as JSON for the page.
+    private(set) var updatesJSON = "[]"
+    private var updatesStamp: Date?
+
     var dismissedKeys: [String] { dismissed.filter { $0.isHidden() }.map(\.key) }
 
     init(log: RunLog = RunLog(), dismissStore: DismissStore = DismissStore()) {
@@ -73,6 +77,17 @@ final class AppModel {
         loadPage()
         today = log.total()
         dismissed = dismissStore.removeExpired()
+        loadUpdates()
+    }
+
+    /// Re-reads today's updates file when it changed; the page shows it
+    /// without a reload.
+    func loadUpdates() {
+        let day = BriefingLocator.today()
+        let stamp = Updates.stamp(for: day)
+        guard stamp != updatesStamp || updatesStamp == nil else { return }
+        updatesStamp = stamp
+        updatesJSON = Updates.json(for: day)
     }
 
     // MARK: Page
@@ -99,6 +114,7 @@ final class AppModel {
         dismissed = dismissStore.removeExpired()
         loadPage()
         if dismissed.count != hiddenBefore { reloadToken += 1 }
+        loadUpdates()
         if page != before || page?.modificationDate != beforeStamp {
             reloadToken += 1
         }
@@ -217,6 +233,7 @@ final class AppModel {
     /// Called from the page when the owner presses an item's "done" button.
     func dismiss(_ item: DismissedItem) {
         dismissed = dismissStore.add(item)
+        dismissStore.recordHistory(item)
     }
 
     /// Called from the page when a dismissed item is put back.

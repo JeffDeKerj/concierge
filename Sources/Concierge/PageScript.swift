@@ -9,6 +9,7 @@ enum PageScript {
     static let dismissHandler = "dismiss"
     static let restoreHandler = "restore"
     static let snoozeHandler = "snooze"
+    static let copyHandler = "copy"
 
     /// Sections whose top-level list items can be dismissed. Matched on the
     /// section's h2 text, lower-cased.
@@ -37,6 +38,11 @@ enum PageScript {
         'li.dismissed .snooze-btn { display: none; }',
         '.snooze-menu { margin-top: 6px; font-size: 12px; color: var(--ink-faint, #6b7280); }',
         '.snooze-menu a { cursor: pointer; margin-left: 6px; }',
+        '.draft { white-space: pre-line; border-left: 2px solid var(--accent, #7aa2f7); padding: 6px 10px; margin-top: 6px;',
+        '  color: var(--ink-soft, #9aa1ad); font-size: 13px; position: relative; }',
+        '.copy-btn { margin-left: 8px; font-size: 12px; cursor: pointer; color: var(--accent, #7aa2f7); }',
+        '#since-morning li { white-space: pre-line; }',
+        '#since-morning li.gone { display: none; }',
         'li.dismissable .dismiss-btn:hover { color: var(--ink, #e6e8ee); border-color: var(--ink-faint, #6b7280); }',
         'li.dismissed { display: none; }',
         'section.show-dismissed li.dismissed { display: block; opacity: .45; }',
@@ -171,8 +177,67 @@ enum PageScript {
         note.appendChild(toggle);
       }
 
+      function addCopyButtons(root) {
+        root.querySelectorAll('.draft').forEach(function (d) {
+          if (d.querySelector('.copy-btn')) { return; }
+          var text = clean(d.textContent);
+          var a = document.createElement('a');
+          a.className = 'copy-btn';
+          a.textContent = 'Copy';
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            post('\(copyHandler)', { text: d.dataset.text || text });
+            a.textContent = 'Copied';
+          });
+          d.appendChild(a);
+        });
+      }
+      addCopyButtons(document);
+
+      // Today's daytime findings, newest first, above the first section.
+      function showUpdates(list) {
+        var old = document.getElementById('since-morning');
+        if (old) { old.remove(); }
+        if (!list || !list.length) { return; }
+        var hidden = {};
+        (window.briefing._hidden || []).forEach(function (k) { hidden[k] = true; });
+        var sec = document.createElement('section');
+        sec.id = 'since-morning';
+        var h = document.createElement('h2');
+        h.textContent = 'Since this morning';
+        sec.appendChild(h);
+        var ul = document.createElement('ul');
+        list.slice().reverse().forEach(function (u) {
+          var li = document.createElement('li');
+          li.dataset.key = u.key || ('update:' + (u.time || '') + ':' + (u.title || ''));
+          if (hidden[li.dataset.key]) { return; }
+          li.classList.add('dismissable');
+          if (u.tag) { var t = document.createElement('span'); t.className = 'tag'; t.textContent = u.tag; li.appendChild(t); li.appendChild(document.createTextNode(' ')); }
+          var b = document.createElement('b'); b.className = 't'; b.textContent = u.title || ''; li.appendChild(b);
+          if (u.text) { var p = document.createElement('div'); p.textContent = u.text; li.appendChild(p); }
+          if (u.draft) { var dr = document.createElement('div'); dr.className = 'draft'; dr.textContent = u.draft; dr.dataset.text = u.draft; li.appendChild(dr); }
+          if (u.link) { var a = document.createElement('a'); a.href = u.link; a.textContent = 'Open'; li.appendChild(a); }
+          var w = document.createElement('div'); w.className = 'when'; w.textContent = (u.kind || '') + ' \\u00B7 ' + (u.time || ''); li.appendChild(w);
+          var x = document.createElement('button'); x.className = 'dismiss-btn'; x.type = 'button'; x.textContent = '\\u00D7';
+          x.addEventListener('click', function (e) {
+            e.preventDefault();
+            li.classList.add('gone');
+            post('\(dismissHandler)', { key: li.dataset.key, title: u.title || '', source: (u.kind || '') + ' \\u00B7 ' + (u.time || ''), section: 'Since this morning' });
+          });
+          li.appendChild(x);
+          ul.appendChild(li);
+        });
+        if (!ul.children.length) { return; }
+        sec.appendChild(ul);
+        addCopyButtons(sec);
+        var first = document.querySelector('section');
+        if (first) { first.parentNode.insertBefore(sec, first); } else { document.body.appendChild(sec); }
+      }
+
       window.briefing = {
+        showUpdates: showUpdates,
         applyDismissed: function (keys) {
+          window.briefing._hidden = keys || [];
           var set = {};
           (keys || []).forEach(function (k) { set[k] = true; });
           var touched = [];
@@ -195,6 +260,11 @@ enum PageScript {
     /// The call that hides already-dismissed items after a load.
     static func applyCall(keys: [String]) -> String {
         "window.briefing && window.briefing.applyDismissed(\(jsArray(keys)));"
+    }
+
+    /// The call that draws "Since this morning" from the updates file.
+    static func updatesCall(_ json: String) -> String {
+        " window.briefing && window.briefing.showUpdates(\(json));"
     }
 
     static func jsArray(_ strings: [String]) -> String {

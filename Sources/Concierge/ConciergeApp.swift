@@ -59,6 +59,7 @@ struct ConciergeApp: App {
                 .help("Show every dismissed item again and let the generator list them next time")
             }
         }
+        Settings { SettingsView().preferredColorScheme(.dark) }
     }
 }
 

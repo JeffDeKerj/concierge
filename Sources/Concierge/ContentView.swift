@@ -34,6 +34,7 @@ struct ContentView: View {
 
             BriefingWebView(page: model.page, reloadToken: model.reloadToken,
                             dismissedKeys: model.dismissedKeys,
+                            updatesJSON: model.updatesJSON,
                             onDismiss: { model.dismiss($0) },
                             onRestore: { model.restore(key: $0) })
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -81,6 +82,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The scheduled task may have written a new page while the app sat
             // in the background, or overnight.
+            model.checkForNewPage()
+        }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             model.checkForNewPage()
         }
         .task {

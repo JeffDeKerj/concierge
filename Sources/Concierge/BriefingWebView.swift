@@ -9,6 +9,7 @@ struct BriefingWebView: NSViewRepresentable {
     let page: BriefingPage?
     let reloadToken: Int
     let dismissedKeys: [String]
+    var updatesJSON = "[]"
     var onDismiss: (DismissedItem) -> Void = { _ in }
     var onRestore: (String) -> Void = { _ in }
 
@@ -16,6 +17,8 @@ struct BriefingWebView: NSViewRepresentable {
         var loadedToken: Int?
         var loadedURL: URL?
         var dismissedKeys: [String] = []
+        var updatesJSON = "[]"
+        var shownUpdates: String?
         var onDismiss: (DismissedItem) -> Void = { _ in }
         var onRestore: (String) -> Void = { _ in }
 
@@ -36,11 +39,15 @@ struct BriefingWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let y = pendingScrollY ?? 0
             pendingScrollY = nil
-            webView.evaluateJavaScript(PageScript.applyCall(keys: dismissedKeys) + " window.scrollTo(0, \(y));")
+            shownUpdates = updatesJSON
+            webView.evaluateJavaScript(PageScript.applyCall(keys: dismissedKeys) + PageScript.updatesCall(updatesJSON)
+                                       + " window.scrollTo(0, \(y));")
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let body = message.body as? [String: Any], let key = body["key"] as? String else { return }
+            guard let body = message.body as? [String: Any] else { return }
+            let key = body["key"] as? String ?? ""
+            if key.isEmpty && message.name != PageScript.copyHandler { return }
             switch message.name {
             case PageScript.dismissHandler:
                 onDismiss(DismissedItem(key: key,
@@ -56,6 +63,11 @@ struct BriefingWebView: NSViewRepresentable {
                                         section: nonEmpty(body["section"]),
                                         dismissedAt: Date(),
                                         until: length.until()))
+            case PageScript.copyHandler:
+                if let text = body["text"] as? String {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                }
             case PageScript.restoreHandler:
                 onRestore(key)
             default:
@@ -87,6 +99,7 @@ struct BriefingWebView: NSViewRepresentable {
         configuration.userContentController.add(proxy, name: PageScript.dismissHandler)
         configuration.userContentController.add(proxy, name: PageScript.restoreHandler)
         configuration.userContentController.add(proxy, name: PageScript.snoozeHandler)
+        configuration.userContentController.add(proxy, name: PageScript.copyHandler)
         configuration.userContentController.addUserScript(
             WKUserScript(source: PageScript.source, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
 
@@ -104,6 +117,9 @@ struct BriefingWebView: NSViewRepresentable {
         sync(context.coordinator)
         if context.coordinator.loadedToken != reloadToken || context.coordinator.loadedURL != page?.url {
             load(into: webView, context: context)
+        } else if let shown = context.coordinator.shownUpdates, shown != updatesJSON {
+            context.coordinator.shownUpdates = updatesJSON
+            webView.evaluateJavaScript(PageScript.updatesCall(updatesJSON))
         }
     }
 
@@ -111,10 +127,12 @@ struct BriefingWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.dismissHandler)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.restoreHandler)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.snoozeHandler)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.copyHandler)
     }
 
     private func sync(_ coordinator: Coordinator) {
         coordinator.dismissedKeys = dismissedKeys
+        coordinator.updatesJSON = updatesJSON
         coordinator.onDismiss = onDismiss
         coordinator.onRestore = onRestore
     }
