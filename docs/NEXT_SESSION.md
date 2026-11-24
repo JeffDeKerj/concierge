@@ -19,10 +19,10 @@ Reference: [What's stable](stable.md) · [Sharp edges](sharp-edges.md) · [Tried
 1. **Grant the app Full Disk Access, then one Refresh from the app.** System
    Settings → Privacy & Security → Full Disk Access → add
    `~/Applications/ClaudeAssistant.app`. The WhatsApp database lives in
-   `~/Library/Group Containers`, which macOS protects; the Terminal has the
-   grant, the app does not, and a process started by the app is charged to the
-   app. The bundle is signed with a stable identity so the grant survives
-   rebuilds. Then press Refresh and check the footer lists WhatsApp.
+   `~/Library/Group Containers`, macOS's "App Data" category, which never
+   prompts and denied the app on 2026-11-24 (see sharp edges). Full Disk
+   Access covers it. The bundle is signed with a stable identity so the grant
+   survives rebuilds. Then press Refresh and check the footer lists WhatsApp.
 2. **Run one Refresh through Antigravity.** The backend reads `agy`'s JSON
    (checked with a one-word call) but has not built a page. Pick Antigravity in
    the Agent menu, press Refresh, and see whether `agy` follows the skill file
