@@ -1,1 +1,26 @@
+# Generated briefing pages hold personal mail: never commit them.
 briefings/
+
+# Swift Package Manager build artifacts
+.build/
+.build-*/
+.swiftpm/
+Package.resolved
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# App bundle produced by Scripts/make_app.sh
+ClaudeAssistant.app/
+*.app/
+
+# Local tool state and scratch
+.codex/
+*.pid
+*.log
+
+# macOS
+.DS_Store
