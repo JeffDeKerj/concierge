@@ -21,6 +21,10 @@ struct RunLog {
         var turns: Int?
         var model: String?
         var failed: Bool
+        var sessionID: String?
+        /// The running total the tool reported for the conversation; `costUSD`
+        /// is this run's share of it.
+        var sessionCostUSD: Double?
     }
 
     private static let encoder: JSONEncoder = {
@@ -35,12 +39,22 @@ struct RunLog {
         return d
     }()
 
-    func append(kind: String, backend: String, report: RunReport) {
-        let entry = Entry(when: Date(), kind: kind, backend: backend, costUSD: report.costUSD,
+    /// Appends the run and returns the report with `costUSD` reduced to this
+    /// run's own share: a continued conversation reports its running total,
+    /// so the earlier total of the same session is taken off.
+    @discardableResult
+    func append(kind: String, backend: String, report: RunReport) -> RunReport {
+        var charged = report
+        if let total = report.costUSD, let session = report.sessionID,
+           let earlier = entries().last(where: { $0.sessionID == session })?.sessionCostUSD {
+            charged.costUSD = max(0, total - earlier)
+        }
+        let entry = Entry(when: Date(), kind: kind, backend: backend, costUSD: charged.costUSD,
                           durationMs: report.durationMs, inputTokens: report.inputTokens,
                           outputTokens: report.outputTokens, turns: report.turns,
-                          model: report.model, failed: report.isError)
-        guard var data = try? Self.encoder.encode(entry) else { return }
+                          model: report.model, failed: report.isError,
+                          sessionID: report.sessionID, sessionCostUSD: report.costUSD)
+        guard var data = try? Self.encoder.encode(entry) else { return charged }
         data.append(0x0A)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
@@ -51,6 +65,7 @@ struct RunLog {
         } else {
             try? data.write(to: url)
         }
+        return charged
     }
 
     func entries() -> [Entry] {

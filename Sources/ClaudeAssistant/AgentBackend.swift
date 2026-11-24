@@ -17,6 +17,10 @@ struct RunReport: Equatable {
     var inputTokens: Int?
     var outputTokens: Int?
     var model: String?
+    /// The conversation the run belongs to. A continued conversation reports
+    /// its running total as the price, so the log needs this to charge only
+    /// the new turn.
+    var sessionID: String?
     /// Tools the run wanted and was refused.
     var deniedTools: [String] = []
 
@@ -57,10 +61,16 @@ protocol AgentBackend {
     var binaryOverrideVariable: String { get }
     /// Where the binary is usually installed, in order of preference.
     var executableCandidates: [String] { get }
-    /// Arguments that build today's briefing page.
-    func refreshArguments() -> [String]
+    /// Models the owner can pick for a run. The first is the CLI's own default
+    /// (empty id); a list of one means the tool offers no choice here.
+    var models: [ModelOption] { get }
+    /// The model id used for each operation until the owner picks another.
+    func defaultModel(for operation: Operation) -> String
+    /// Arguments that build today's briefing page. `model` is one of `models`'
+    /// ids; empty means the CLI's default.
+    func refreshArguments(model: String) -> [String]
     /// Arguments for a follow-up; `continuing` resumes the latest conversation in the folder.
-    func askArguments(question: String, continuing: Bool) -> [String]
+    func askArguments(question: String, continuing: Bool, model: String) -> [String]
     /// Read the process output into a report.
     func parse(_ output: ProcessOutput) -> RunReport
     /// True when the failure means there is no conversation to continue.
@@ -80,6 +90,63 @@ extension AgentBackend {
 
     func isNoConversation(_ report: RunReport) -> Bool {
         report.isError && report.errorText.localizedCaseInsensitiveContains("no conversation")
+    }
+
+    var models: [ModelOption] { [.cliDefault] }
+    func defaultModel(for operation: Operation) -> String { "" }
+    func refreshArguments() -> [String] { refreshArguments(model: "") }
+    func askArguments(question: String, continuing: Bool) -> [String] {
+        askArguments(question: question, continuing: continuing, model: "")
+    }
+}
+
+/// The two things the app asks an agent to do. Each has its own model.
+enum Operation: String, CaseIterable {
+    /// Build the page: long, many tools, worth the strongest model.
+    case refresh
+    /// Answer a question about the page: short, worth a quick model.
+    case ask
+
+    var label: String {
+        switch self {
+        case .refresh: return "Model for Refresh"
+        case .ask: return "Model for Questions"
+        }
+    }
+}
+
+/// One entry of a backend's model menu. `id` is what the CLI's `--model`
+/// takes; empty means "let the CLI choose".
+struct ModelOption: Equatable, Identifiable {
+    let id: String
+    let name: String
+
+    static let cliDefault = ModelOption(id: "", name: "Default")
+}
+
+/// Which model each operation runs on, per backend, kept in UserDefaults.
+enum ModelSettings {
+    static func key(_ operation: Operation, _ backend: AgentBackend) -> String {
+        "model.\(operation.rawValue).\(backend.id)"
+    }
+
+    static func model(for operation: Operation, backend: AgentBackend) -> String {
+        let saved = UserDefaults.standard.string(forKey: key(operation, backend))
+        let id = saved ?? backend.defaultModel(for: operation)
+        // A model the backend no longer lists falls back to its default.
+        return backend.models.contains { $0.id == id } ? id : backend.defaultModel(for: operation)
+    }
+
+    static func set(_ id: String, for operation: Operation, backend: AgentBackend) {
+        UserDefaults.standard.set(id, forKey: key(operation, backend))
+    }
+
+    static func reset() {
+        for backend in AgentBackends.all {
+            for operation in Operation.allCases {
+                UserDefaults.standard.removeObject(forKey: key(operation, backend))
+            }
+        }
     }
 }
 

@@ -11,7 +11,7 @@ dir="${CLAUDE_ASSISTANT_DIR:-$PWD}"
 mode=$(cat "$dir/stub-mode" 2>/dev/null || echo echo)
 
 answer() { # $1 = result text, $2 = extra JSON fields (optional)
-  printf '{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"num_turns":3,"result":"%s","total_cost_usd":0.0125,"usage":{"input_tokens":100,"cache_creation_input_tokens":2000,"cache_read_input_tokens":3000,"output_tokens":50},"modelUsage":{"claude-opus-5-5[1m]":{}},"permission_denials":[%s]}\n' "$1" "${2:-}"
+  printf '{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"num_turns":3,"result":"%s","session_id":"stub-session","total_cost_usd":0.0125,"usage":{"input_tokens":100,"cache_creation_input_tokens":2000,"cache_read_input_tokens":3000,"output_tokens":50},"modelUsage":{"claude-opus-5-5[1m]":{}},"permission_denials":[%s]}\n' "$1" "${2:-}"
 }
 
 case "$mode" in

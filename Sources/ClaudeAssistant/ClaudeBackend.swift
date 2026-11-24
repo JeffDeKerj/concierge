@@ -14,15 +14,32 @@ struct ClaudeBackend: AgentBackend {
         "/usr/bin/claude",
     ]
 
-    func refreshArguments() -> [String] {
-        ["-p", "/briefing", "--output-format", "json"]
+    /// `claude --model` takes an alias for the latest model of each size.
+    let models = [
+        ModelOption.cliDefault,
+        ModelOption(id: "opus", name: "Opus"),
+        ModelOption(id: "sonnet", name: "Sonnet"),
+        ModelOption(id: "haiku", name: "Haiku"),
+    ]
+
+    /// The page needs the strongest model; a question about it does not.
+    func defaultModel(for operation: Operation) -> String {
+        operation == .refresh ? "opus" : "sonnet"
     }
 
-    func askArguments(question: String, continuing: Bool) -> [String] {
+    func refreshArguments(model: String) -> [String] {
+        ["-p", "/briefing", "--output-format", "json"] + modelArguments(model)
+    }
+
+    func askArguments(question: String, continuing: Bool, model: String) -> [String] {
         var args = ["-p"]
         if continuing { args.append("--continue") }
-        args += ["--output-format", "json", question]
+        args += ["--output-format", "json"] + modelArguments(model) + [question]
         return args
+    }
+
+    private func modelArguments(_ model: String) -> [String] {
+        model.isEmpty ? [] : ["--model", model]
     }
 
     func parse(_ output: ProcessOutput) -> RunReport {
@@ -37,6 +54,7 @@ struct ClaudeBackend: AgentBackend {
         report.isError = (json["is_error"] as? Bool ?? false) || output.status != 0
         report.errorText = report.isError ? (report.text.isEmpty ? output.combined : report.text) : ""
         report.costUSD = json["total_cost_usd"] as? Double
+        report.sessionID = json["session_id"] as? String
         report.durationMs = JSONReading.int(json["duration_ms"])
         report.turns = JSONReading.int(json["num_turns"])
         if let usage = json["usage"] as? [String: Any] {

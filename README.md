@@ -6,7 +6,7 @@ which writes `briefings/<YYYY-MM-DD>.html` from Gmail, Google Calendar,
 WhatsApp and the Obsidian digests. A scheduled task in the Claude desktop app
 runs it every morning at about 07:20.
 
-The app does three things:
+The app:
 
 - shows today's page in a web view, or the newest one with a one-line notice
   when today's is not there yet;
@@ -14,6 +14,13 @@ The app does three things:
   in this folder, shows a spinner, and reloads the page as soon as the file changes;
 - the field at the bottom sends a follow-up question to `claude -p --continue`
   and shows the reply under the page;
+- every item on the page has a "×": press it when you are done with the item.
+  It disappears, is listed in `briefings/dismissed.json`, and the generator
+  leaves it off the next page unless something new happens in that thread.
+  "Show" under a section brings dismissed items back into view, "↩" restores
+  one, and View > Forget Dismissed Items clears the list;
+- the Agent menu picks a model for Refresh and another for questions
+  (Opus and Sonnet by default for Claude);
 - a line under the page says what the last Refresh and the last reply cost,
   how long they took and how many tokens they used, plus today's total. These
   are API prices: on a subscription nothing is billed, but it is what the same

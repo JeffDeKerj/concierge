@@ -16,10 +16,30 @@ final class AppModel {
 
     // The agent
     var backendID: String = AgentBackends.current().id {
-        didSet { UserDefaults.standard.set(backendID, forKey: AgentBackends.settingsKey) }
+        didSet {
+            UserDefaults.standard.set(backendID, forKey: AgentBackends.settingsKey)
+            loadModels()
+        }
     }
     var backend: AgentBackend { AgentBackends.named(backendID) }
     private let log: RunLog
+
+    /// The model each operation runs on with the current backend. Saved per
+    /// backend, so switching agents brings back each one's own choice.
+    var refreshModel: String = "" {
+        didSet { if !loadingModels { ModelSettings.set(refreshModel, for: .refresh, backend: backend) } }
+    }
+    var askModel: String = "" {
+        didSet { if !loadingModels { ModelSettings.set(askModel, for: .ask, backend: backend) } }
+    }
+    private var loadingModels = false
+
+    private func loadModels() {
+        loadingModels = true
+        refreshModel = ModelSettings.model(for: .refresh, backend: backend)
+        askModel = ModelSettings.model(for: .ask, backend: backend)
+        loadingModels = false
+    }
 
     // Refresh
     private(set) var isRefreshing = false
@@ -49,6 +69,7 @@ final class AppModel {
     init(log: RunLog = RunLog(), dismissStore: DismissStore = DismissStore()) {
         self.log = log
         self.dismissStore = dismissStore
+        loadModels()
         loadPage()
         today = log.total()
         dismissed = dismissStore.load()
@@ -113,7 +134,7 @@ final class AppModel {
             defer { watcher.cancel() }
 
             do {
-                let output = try await refreshRunner.run(backend, arguments: backend.refreshArguments())
+                let output = try await refreshRunner.run(backend, arguments: backend.refreshArguments(model: refreshModel))
                 let report = backend.parse(output)
                 record(kind: "refresh", report)
                 if report.isError {
@@ -159,14 +180,15 @@ final class AppModel {
         askError = nil
         answer = nil
         let backend = self.backend
+        let model = askModel
 
         Task {
             do {
-                var output = try await askRunner.run(backend, arguments: backend.askArguments(question: q, continuing: true))
+                var output = try await askRunner.run(backend, arguments: backend.askArguments(question: q, continuing: true, model: model))
                 var report = backend.parse(output)
                 if backend.isNoConversation(report) {
                     let intro = page.map { "Regarding the briefing page at \($0.url.path): " } ?? ""
-                    output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + q, continuing: false))
+                    output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + q, continuing: false, model: model))
                     report = backend.parse(output)
                 }
                 record(kind: "ask", report)
@@ -209,8 +231,8 @@ final class AppModel {
     // MARK: Cost
 
     private func record(kind: String, _ report: RunReport) {
-        if kind == "refresh" { lastRefresh = report } else { lastAsk = report }
-        log.append(kind: kind, backend: backendID, report: report)
+        let charged = log.append(kind: kind, backend: backendID, report: report)
+        if kind == "refresh" { lastRefresh = charged } else { lastAsk = charged }
         today = log.total()
     }
 }
