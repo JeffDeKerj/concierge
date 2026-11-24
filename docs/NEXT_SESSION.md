@@ -1,6 +1,6 @@
 # NEXT_SESSION
 
-Main tip `TIP`. Remote `origin` is
+Main tip `1fa68ec`. Remote `origin` is
 `git@github.com:JeffDeKerj/claude-assistant.git`. The app opens on today's
 briefing page (or the newest, with a notice), rebuilds it headless from a
 Refresh button, answers follow-up questions under it, and shows what every run
