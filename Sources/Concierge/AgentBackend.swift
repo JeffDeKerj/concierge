@@ -161,7 +161,7 @@ enum AgentBackends {
 
     /// The backend to use: the environment wins, then the saved choice, then Claude.
     static func current() -> AgentBackend {
-        if let id = ProcessInfo.processInfo.environment["CLAUDE_ASSISTANT_AGENT"], !id.isEmpty {
+        if let id = ProcessInfo.processInfo.environment["CONCIERGE_AGENT"], !id.isEmpty {
             return named(id)
         }
         return named(UserDefaults.standard.string(forKey: settingsKey) ?? defaultID)

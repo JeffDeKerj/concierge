@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct ClaudeAssistantApp: App {
+struct ConciergeApp: App {
     @State private var model = AppModel()
 
     init() {
@@ -11,7 +11,7 @@ struct ClaudeAssistantApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Briefing") {
+        WindowGroup("Concierge") {
             ContentView()
                 .environment(model)
                 .preferredColorScheme(.dark)

@@ -6,9 +6,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
-APP_NAME="ClaudeAssistant"
-DISPLAY_NAME="Briefing"
-BUNDLE_ID="local.jeffdekerj.claude-assistant"
+APP_NAME="Concierge"
+DISPLAY_NAME="Concierge"
+BUNDLE_ID="local.jeffdekerj.concierge"
 APP_DIR="$ROOT/$APP_NAME.app"
 
 # shellcheck source=Scripts/swift-build-flags.sh

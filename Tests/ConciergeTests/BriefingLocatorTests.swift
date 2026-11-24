@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import ClaudeAssistant
+@testable import Concierge
 
 extension SerialTests {
 @Suite struct BriefingLocatorTests {

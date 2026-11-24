@@ -5,7 +5,7 @@ import Foundation
 struct ClaudeBackend: AgentBackend {
     let id = "claude"
     let displayName = "Claude Code"
-    let binaryOverrideVariable = "CLAUDE_ASSISTANT_CLAUDE_BIN"
+    let binaryOverrideVariable = "CONCIERGE_CLAUDE_BIN"
     let executableCandidates = [
         NSHomeDirectory() + "/.local/bin/claude",
         "/opt/homebrew/bin/claude",

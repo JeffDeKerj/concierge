@@ -2,10 +2,10 @@
 
 Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges.md).
 
-- **Layout.** Swift package, one executable target `ClaudeAssistant`, macOS 14+,
+- **Layout.** Swift package, one executable target `Concierge`, macOS 14+,
   SwiftUI with `@Observable`. `Scripts/make_app.sh` builds the release binary
-  and wraps it as `ClaudeAssistant.app` (display name "Briefing", bundle id
-  `local.jeffdekerj.claude-assistant`, icon from `Resources/AppIcon.icns`,
+  and wraps it as `Concierge.app` (display name "Concierge", bundle id
+  `local.jeffdekerj.concierge`, icon from `Resources/AppIcon.icns`,
   signed with the Mac's stable local identity). Same shape as `finance-update-ui`.
 - **Page choice** (`BriefingPage.swift`): today's `briefings/YYYY-MM-DD.html` in
   Europe/London, else the newest file whose stem is a date, else an empty page
@@ -16,7 +16,7 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   browser. The web view draws no background, so the page's own dark colour shows.
 - **Agents** (`AgentBackend.swift`): the CLI behind every run is one of
   `ClaudeBackend`, `AntigravityBackend` or `CodexBackend`, chosen in the Agent
-  menu (saved in UserDefaults as `agentBackend`) or by `CLAUDE_ASSISTANT_AGENT`.
+  menu (saved in UserDefaults as `agentBackend`) or by `CONCIERGE_AGENT`.
   A backend knows its binary, its arguments for Refresh and for a question,
   and how to read its output into a `RunReport`.
 - **Cost** (`RunReport`, `RunLog.swift`): every run's price, duration, turns,
@@ -63,8 +63,8 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
 - **Dark appearance** is forced twice: `NSApplication.shared.appearance` at
   launch and `.preferredColorScheme(.dark)` on the window.
 - **Tests** (`Scripts/test.sh`): Swift Testing, pointed at a throwaway folder
-  with `CLAUDE_ASSISTANT_DIR` and at `Scripts/claude-stub.sh` with
-  `CLAUDE_ASSISTANT_CLAUDE_BIN`. The stub's behaviour comes from a `stub-mode`
+  with `CONCIERGE_DIR` and at `Scripts/claude-stub.sh` with
+  `CONCIERGE_CLAUDE_BIN`. The stub's behaviour comes from a `stub-mode`
   file in that folder. All suites nest under one serialized parent because they
   share the folder.
 - **Reopening** re-checks the folder: `NSApplication.didBecomeActiveNotification`

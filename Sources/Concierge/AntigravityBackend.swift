@@ -7,7 +7,7 @@ import Foundation
 struct AntigravityBackend: AgentBackend {
     let id = "antigravity"
     let displayName = "Antigravity"
-    let binaryOverrideVariable = "CLAUDE_ASSISTANT_AGY_BIN"
+    let binaryOverrideVariable = "CONCIERGE_AGY_BIN"
     let executableCandidates = [
         "/opt/homebrew/bin/agy",
         "/usr/local/bin/agy",

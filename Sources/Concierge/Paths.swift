@@ -4,10 +4,10 @@ import Foundation
 /// directory for every `claude` run, so `--continue` picks up the briefing run.
 enum Paths {
     static let project: URL = {
-        if let dir = ProcessInfo.processInfo.environment["CLAUDE_ASSISTANT_DIR"], !dir.isEmpty {
+        if let dir = ProcessInfo.processInfo.environment["CONCIERGE_DIR"], !dir.isEmpty {
             return URL(fileURLWithPath: dir)
         }
-        return URL(fileURLWithPath: "/Users/jeffdekerj/code/swift/claude-assistant")
+        return URL(fileURLWithPath: "/Users/jeffdekerj/code/swift/concierge")
     }()
 
     static var briefings: URL { project.appendingPathComponent("briefings") }

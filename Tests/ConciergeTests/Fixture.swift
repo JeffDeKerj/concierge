@@ -1,5 +1,5 @@
 import Foundation
-@testable import ClaudeAssistant
+@testable import Concierge
 
 /// The throwaway project folder Scripts/test.sh points the app at.
 enum Fixture {
