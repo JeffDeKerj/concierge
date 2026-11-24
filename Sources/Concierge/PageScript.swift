@@ -8,6 +8,7 @@ enum PageScript {
     /// Message handler names the script posts to.
     static let dismissHandler = "dismiss"
     static let restoreHandler = "restore"
+    static let snoozeHandler = "snooze"
 
     /// Sections whose top-level list items can be dismissed. Matched on the
     /// section's h2 text, lower-cased.
@@ -31,6 +32,11 @@ enum PageScript {
         '  border: 1px solid var(--line, #2a2f3a); border-radius: 7px; background: transparent;',
         '  color: var(--ink-faint, #6b7280); font: 15px/1 -apple-system, sans-serif; cursor: pointer; padding: 0; }',
         'li.dismissable:first-child .dismiss-btn { top: -2px; }',
+        'li.dismissable .snooze-btn { top: 38px; font-size: 13px; }',
+        'li.dismissable:first-child .snooze-btn { top: 28px; }',
+        'li.dismissed .snooze-btn { display: none; }',
+        '.snooze-menu { margin-top: 6px; font-size: 12px; color: var(--ink-faint, #6b7280); }',
+        '.snooze-menu a { cursor: pointer; margin-left: 6px; }',
         'li.dismissable .dismiss-btn:hover { color: var(--ink, #e6e8ee); border-color: var(--ink-faint, #6b7280); }',
         'li.dismissed { display: none; }',
         'section.show-dismissed li.dismissed { display: block; opacity: .45; }',
@@ -59,7 +65,7 @@ enum PageScript {
         var t = li.querySelector('.t');
         if (t) { return clean(t.textContent); }
         var copy = li.cloneNode(true);
-        copy.querySelectorAll('.tag, .when, .dismiss-btn').forEach(function (n) { n.remove(); });
+        copy.querySelectorAll('.tag, .when, .dismiss-btn, .snooze-menu').forEach(function (n) { n.remove(); });
         return clean(copy.textContent);
       }
       function titleFor(li) { return textOf(li).slice(0, 200); }
@@ -80,27 +86,62 @@ enum PageScript {
           li.appendChild(btn);
           btn.addEventListener('click', function (event) {
             event.preventDefault();
+            closeMenu(li);
             if (li.classList.contains('dismissed')) {
               li.classList.remove('dismissed');
               post('\(restoreHandler)', { key: li.dataset.key });
             } else {
               li.classList.add('dismissed');
-              post('\(dismissHandler)', {
-                key: li.dataset.key, title: titleFor(li), source: sourceFor(li), section: headingOf(section)
-              });
+              post('\(dismissHandler)', details(li, section));
             }
             refresh(section);
+          });
+          var later = document.createElement('button');
+          later.className = 'dismiss-btn snooze-btn';
+          later.type = 'button';
+          later.textContent = '\\u23F1';
+          later.title = 'Not now: bring this back later';
+          li.appendChild(later);
+          later.addEventListener('click', function (event) {
+            event.preventDefault();
+            if (li.querySelector(':scope > .snooze-menu')) { closeMenu(li); return; }
+            var menu = document.createElement('div');
+            menu.className = 'snooze-menu';
+            menu.appendChild(document.createTextNode('Bring back'));
+            [['tomorrow', 'tomorrow'], ['week', 'next Monday']].forEach(function (choice) {
+              var a = document.createElement('a');
+              a.textContent = choice[1];
+              a.addEventListener('click', function (e) {
+                e.preventDefault();
+                closeMenu(li);
+                li.classList.add('dismissed');
+                var body = details(li, section);
+                body.length = choice[0];
+                post('\(snoozeHandler)', body);
+                refresh(section);
+              });
+              menu.appendChild(a);
+            });
+            li.appendChild(menu);
           });
           items.push(li);
         });
         refresh(section);
       });
 
+      function details(li, section) {
+        return { key: li.dataset.key, title: titleFor(li), source: sourceFor(li), section: headingOf(section) };
+      }
+      function closeMenu(li) {
+        var m = li.querySelector(':scope > .snooze-menu');
+        if (m) { m.remove(); }
+      }
+
       function refresh(section) {
         var all = section.querySelectorAll(':scope > ul > li.dismissable');
         var gone = section.querySelectorAll(':scope > ul > li.dismissed');
         all.forEach(function (li) {
-          var btn = li.querySelector('.dismiss-btn');
+          var btn = li.querySelector('.dismiss-btn:not(.snooze-btn)');
           var done = li.classList.contains('dismissed');
           btn.textContent = done ? '\\u21A9' : '\\u00D7';
           btn.title = done ? 'Put this back on the briefing' : 'Done with this: keep it off the briefing';
@@ -119,7 +160,7 @@ enum PageScript {
         var showing = section.classList.contains('show-dismissed');
         var word = gone.length === all.length ? 'All ' + gone.length : String(gone.length);
         note.innerHTML = '';
-        note.appendChild(document.createTextNode(word + ' dismissed \\u00B7 '));
+        note.appendChild(document.createTextNode(word + ' set aside \\u00B7 '));
         var toggle = document.createElement('a');
         toggle.textContent = showing ? 'Hide' : 'Show';
         toggle.addEventListener('click', function (event) {

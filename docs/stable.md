@@ -39,6 +39,7 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   there is no conversation, the question is sent again as a fresh one,
   prefixed with the path of the page on screen. Refused tools are listed by
   name in the red line.
+- **Snooze.** A "⏱" under each item's "×" hides it until 06:00 tomorrow or next Monday (`until` in `dismissed.json`); expired snoozes are dropped by the app and brought back by the skill tagged BACK.
 - **Dismissed items** (`PageScript.swift`, `DismissStore.swift`): the app injects a
   script into every page that puts a "×" on each top-level item of the four
   list sections. A press hides the item and records it in

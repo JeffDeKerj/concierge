@@ -48,6 +48,14 @@ struct BriefingWebView: NSViewRepresentable {
                                         source: nonEmpty(body["source"]),
                                         section: nonEmpty(body["section"]),
                                         dismissedAt: Date()))
+            case PageScript.snoozeHandler:
+                let length = SnoozeLength(rawValue: body["length"] as? String ?? "") ?? .tomorrow
+                onDismiss(DismissedItem(key: key,
+                                        title: body["title"] as? String ?? "",
+                                        source: nonEmpty(body["source"]),
+                                        section: nonEmpty(body["section"]),
+                                        dismissedAt: Date(),
+                                        until: length.until()))
             case PageScript.restoreHandler:
                 onRestore(key)
             default:
@@ -78,6 +86,7 @@ struct BriefingWebView: NSViewRepresentable {
         let proxy = HandlerProxy(context.coordinator)
         configuration.userContentController.add(proxy, name: PageScript.dismissHandler)
         configuration.userContentController.add(proxy, name: PageScript.restoreHandler)
+        configuration.userContentController.add(proxy, name: PageScript.snoozeHandler)
         configuration.userContentController.addUserScript(
             WKUserScript(source: PageScript.source, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
 
@@ -101,6 +110,7 @@ struct BriefingWebView: NSViewRepresentable {
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.dismissHandler)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.restoreHandler)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: PageScript.snoozeHandler)
     }
 
     private func sync(_ coordinator: Coordinator) {

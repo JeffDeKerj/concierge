@@ -52,3 +52,47 @@ struct DismissStoreTests {
         #expect(PageScript.jsArray(["a\"b"]) == "[\"a\\\"b\"]")
     }
 }
+
+struct SnoozeTests {
+    private let london: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Europe/London")!
+        return c
+    }()
+
+    private func date(_ text: String) -> Date { ISO8601DateFormatter().date(from: text)! }
+
+    @Test func snoozeEndsBeforeTheMorningRun() {
+        // Tuesday 24 November 2026, 21:30 in London.
+        let now = date("2026-11-24T21:30:00Z")
+        #expect(SnoozeLength.tomorrow.until(from: now, calendar: london) == date("2026-11-25T06:00:00Z"))
+        #expect(SnoozeLength.nextWeek.until(from: now, calendar: london) == date("2026-11-30T06:00:00Z"))
+    }
+
+    @Test func expiredSnoozesAreDropped() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("snooze-\(UUID().uuidString)")
+        let store = DismissStore(url: dir.appendingPathComponent("dismissed.json"))
+        let now = Date()
+        store.add(DismissedItem(key: "done", title: "Done", dismissedAt: now))
+        store.add(DismissedItem(key: "later", title: "Later", dismissedAt: now, until: now.addingTimeInterval(3600)))
+        store.add(DismissedItem(key: "back", title: "Back", dismissedAt: now, until: now.addingTimeInterval(-60)))
+        #expect(store.removeExpired(now: now).map(\.key) == ["done", "later"])
+        #expect(store.load().map(\.key) == ["done", "later"])
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    @Test func fileWithoutUntilStillReads() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("snooze-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("dismissed.json")
+        try Data(#"[{"key":"mail:1","title":"T","dismissedAt":"2026-11-24T10:00:00Z"}]"#.utf8).write(to: url)
+        let items = DismissStore(url: url).load()
+        #expect(items.count == 1 && items[0].until == nil && items[0].isHidden())
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    @Test func scriptOffersSnooze() {
+        #expect(PageScript.source.contains("'\(PageScript.snoozeHandler)'"))
+        #expect(PageScript.source.contains("next Monday"))
+    }
+}
