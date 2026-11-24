@@ -12,8 +12,38 @@ struct DismissedItem: Codable, Equatable, Identifiable {
     /// The section the item sat in, e.g. "Urgent actions".
     var section: String?
     var dismissedAt: Date
+    /// Set when the item was snoozed rather than dismissed: it comes back
+    /// once this time has passed.
+    var until: Date? = nil
 
     var id: String { key }
+
+    /// True while the item should stay off the page.
+    func isHidden(at now: Date = Date()) -> Bool {
+        guard let until else { return true }
+        return until > now
+    }
+}
+
+/// How long a snooze lasts. The page offers both.
+enum SnoozeLength: String {
+    case tomorrow
+    case nextWeek = "week"
+
+    /// Tomorrow at 06:00, or next Monday at 06:00: before the morning run, so
+    /// the item is back on the next page.
+    func until(from now: Date = Date(), calendar: Calendar = .current) -> Date {
+        let morning = DateComponents(hour: 6, minute: 0)
+        switch self {
+        case .tomorrow:
+            let next = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))!
+            return calendar.date(bySettingHour: 6, minute: 0, second: 0, of: next)!
+        case .nextWeek:
+            var monday = morning
+            monday.weekday = 2
+            return calendar.nextDate(after: now, matching: monday, matchingPolicy: .nextTime)!
+        }
+    }
 }
 
 /// `briefings/dismissed.json`: a pretty-printed array, so the headless
@@ -50,6 +80,15 @@ struct DismissStore {
         items.append(item)
         save(items)
         return items
+    }
+
+    /// Drops snoozes whose time has passed, so those items show again.
+    @discardableResult
+    func removeExpired(now: Date = Date()) -> [DismissedItem] {
+        let all = load()
+        let kept = all.filter { $0.isHidden(at: now) }
+        if kept.count != all.count { save(kept) }
+        return kept
     }
 
     @discardableResult

@@ -64,7 +64,7 @@ final class AppModel {
     /// Items the owner is done with. Hidden on the page; the generator leaves
     /// them out of the next one.
     private(set) var dismissed: [DismissedItem] = []
-    var dismissedKeys: [String] { dismissed.map(\.key) }
+    var dismissedKeys: [String] { dismissed.filter { $0.isHidden() }.map(\.key) }
 
     init(log: RunLog = RunLog(), dismissStore: DismissStore = DismissStore()) {
         self.log = log
@@ -72,7 +72,7 @@ final class AppModel {
         loadModels()
         loadPage()
         today = log.total()
-        dismissed = dismissStore.load()
+        dismissed = dismissStore.removeExpired()
     }
 
     // MARK: Page
@@ -95,7 +95,10 @@ final class AppModel {
     func checkForNewPage() {
         let before = page
         let beforeStamp = before?.modificationDate
+        let hiddenBefore = dismissed.count
+        dismissed = dismissStore.removeExpired()
         loadPage()
+        if dismissed.count != hiddenBefore { reloadToken += 1 }
         if page != before || page?.modificationDate != beforeStamp {
             reloadToken += 1
         }
