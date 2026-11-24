@@ -82,6 +82,19 @@ struct DismissStore {
         return items
     }
 
+    /// Every dismissal and snooze, kept for the skill to learn from. Never
+    /// pruned by the app; one JSON object per line.
+    func recordHistory(_ item: DismissedItem) {
+        let history = url.deletingLastPathComponent().appendingPathComponent("dismiss-history.jsonl")
+        guard var data = try? Self.encoder.encode(item) else { return }
+        data = Data(String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\n", with: "").utf8)
+        data.append(0x0A)
+        if let h = try? FileHandle(forWritingTo: history) {
+            defer { try? h.close() }
+            _ = try? h.seekToEnd(); try? h.write(contentsOf: data)
+        } else { try? data.write(to: history) }
+    }
+
     /// Drops snoozes whose time has passed, so those items show again.
     @discardableResult
     func removeExpired(now: Date = Date()) -> [DismissedItem] {

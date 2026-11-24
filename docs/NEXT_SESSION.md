@@ -17,6 +17,16 @@ Session logs: [2026-11-24](sessions/2026-11-24.md), [2026-11-24b](sessions/2026-
 
 Reference: [What's stable](stable.md) · [Sharp edges](sharp-edges.md) · [Tried](tried.md).
 
+
+**Proactive since 2026-11-24 (session log 2026-11-24e).** Daytime checks, meeting
+prep and an evening wrap-up run from launchd (`Scripts/tick.py`), drafts, open
+items and learning run inside the morning page, and Concierge > Settings switches
+each off or pauses everything for a day.
+
+First things to check: tomorrow's page (drafts, "Open N days", agenda file,
+footer "Left off" line), `briefings/state/tick.log`, the 18:30 wrap-up entry,
+and that a phone notification arrived through ntfy.
+
 ## Next picks
 
 1. **Check that the skill honours dismissed items.** Tomorrow's scheduled

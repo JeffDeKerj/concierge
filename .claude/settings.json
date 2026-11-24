@@ -5,6 +5,8 @@
       "mcp__claude_ai_Gmail__get_thread",
       "mcp__claude_ai_Gmail__get_message",
       "mcp__claude_ai_Gmail__list_labels",
+      "mcp__claude_ai_Gmail__list_drafts",
+      "mcp__claude_ai_Gmail__create_draft",
       "mcp__claude_ai_Google_Calendar__list_calendars",
       "mcp__claude_ai_Google_Calendar__list_events",
       "mcp__claude_ai_Google_Calendar__search_events",
