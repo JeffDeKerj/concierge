@@ -32,7 +32,10 @@ struct ContentView: View {
                 .accessibilityIdentifier("refreshError")
             }
 
-            BriefingWebView(page: model.page, reloadToken: model.reloadToken)
+            BriefingWebView(page: model.page, reloadToken: model.reloadToken,
+                            dismissedKeys: model.dismissedKeys,
+                            onDismiss: { model.dismiss($0) },
+                            onRestore: { model.restore(key: $0) })
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()

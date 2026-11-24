@@ -43,6 +43,14 @@ struct ClaudeAssistantApp: App {
                 Button("Reveal Briefings in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([Paths.briefings])
                 }
+                Divider()
+                Button(model.dismissed.isEmpty
+                       ? "Forget Dismissed Items"
+                       : "Forget \(model.dismissed.count) Dismissed \(model.dismissed.count == 1 ? "Item" : "Items")") {
+                    model.forgetDismissed()
+                }
+                .disabled(model.dismissed.isEmpty)
+                .help("Show every dismissed item again and let the generator list them next time")
             }
         }
     }
