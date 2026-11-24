@@ -1,7 +1,8 @@
 # NEXT_SESSION
 
-Main tip `099d358` (the initial commit: only `.gitignore`). The whole app is on
-branch `app-v1`, unmerged and unpushed. Version 1 opens on today's briefing
+Main tip `099d358` (the initial commit: only `.gitignore`). Remote `origin` is
+`git@github.com:JeffDeKerj/claude-assistant.git`, both branches pushed. The whole app is on
+branch `app-v1`, unmerged. Version 1 opens on today's briefing
 page, falls back to the newest page with a notice, runs the generator headless
 from a Refresh button and reloads when the file changes, and sends a follow-up
 question to `claude -p --continue`. Ten tests pass against a stub `claude`.
