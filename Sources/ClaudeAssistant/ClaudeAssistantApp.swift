@@ -32,6 +32,12 @@ struct ClaudeAssistantApp: App {
                 .pickerStyle(.inline)
                 .disabled(model.isRefreshing || model.isAsking)
                 Divider()
+                // Menus get no environment from the window, so the model is passed in.
+                ModelMenu(model: model, operation: .refresh, selection: Binding(
+                    get: { model.refreshModel }, set: { model.refreshModel = $0 }))
+                ModelMenu(model: model, operation: .ask, selection: Binding(
+                    get: { model.askModel }, set: { model.askModel = $0 }))
+                Divider()
                 Button("Reveal Run Log in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([Paths.briefings.appendingPathComponent("runs.jsonl")])
                 }
@@ -53,5 +59,27 @@ struct ClaudeAssistantApp: App {
                 .help("Show every dismissed item again and let the generator list them next time")
             }
         }
+    }
+}
+
+/// A submenu of the current agent's models for one operation. Greyed out
+/// when the agent offers no choice.
+private struct ModelMenu: View {
+    let model: AppModel
+    let operation: Operation
+    let selection: Binding<String>
+
+    var body: some View {
+        let options = model.backend.models
+        Menu(operation.label) {
+            Picker(operation.label, selection: selection) {
+                ForEach(options) { option in
+                    Text(option.name).tag(option.id)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+        .disabled(options.count <= 1)
     }
 }

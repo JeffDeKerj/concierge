@@ -14,14 +14,28 @@ struct AntigravityBackend: AgentBackend {
         NSHomeDirectory() + "/.local/bin/agy",
     ]
 
-    func refreshArguments() -> [String] {
-        ["-p", Paths.briefingInstructions, "--output-format", "json", "--mode", "accept-edits"]
+    /// A few of what `agy models` listed on 2026-11-24; the full list is long
+    /// and changes, so `agy models` is the reference.
+    let models = [
+        ModelOption.cliDefault,
+        ModelOption(id: "gemini-4-neon-high", name: "Gemini 4 Neon (High)"),
+        ModelOption(id: "gemini-4-neon-medium", name: "Gemini 4 Neon (Medium)"),
+        ModelOption(id: "gemini-4-neon-low", name: "Gemini 4 Neon (Low)"),
+        ModelOption(id: "gemini-3.8-flash-medium", name: "Gemini 3.8 Flash (Medium)"),
+    ]
+
+    func refreshArguments(model: String) -> [String] {
+        ["-p", Paths.briefingInstructions, "--output-format", "json", "--mode", "accept-edits"] + modelArguments(model)
     }
 
-    func askArguments(question: String, continuing: Bool) -> [String] {
+    func askArguments(question: String, continuing: Bool, model: String) -> [String] {
         var args = ["-p", question, "--output-format", "json"]
         if continuing { args.append("--continue") }
-        return args
+        return args + modelArguments(model)
+    }
+
+    private func modelArguments(_ model: String) -> [String] {
+        model.isEmpty ? [] : ["--model", model]
     }
 
     func parse(_ output: ProcessOutput) -> RunReport {
@@ -38,6 +52,7 @@ struct AntigravityBackend: AgentBackend {
         report.isError = output.status != 0 || (json["is_error"] as? Bool ?? false) || status.lowercased() != "success"
         report.errorText = report.isError ? (report.text.isEmpty ? output.combined : report.text) : ""
         report.costUSD = json["total_cost_usd"] as? Double
+        report.sessionID = json["conversation_id"] as? String
         if let ms = JSONReading.int(json["duration_ms"]) {
             report.durationMs = ms
         } else if let seconds = json["duration_seconds"] as? Double {

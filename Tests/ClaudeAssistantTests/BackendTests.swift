@@ -5,7 +5,7 @@ import Testing
 struct BackendTests {
     @Test func claudeReadsCostTokensModelAndDenials() {
         let json = """
-        {"type":"result","is_error":false,"duration_ms":192000,"num_turns":41,"result":"Written.",
+        {"type":"result","is_error":false,"duration_ms":192000,"num_turns":41,"result":"Written.","session_id":"abc",
          "total_cost_usd":1.2345,"usage":{"input_tokens":12,"cache_creation_input_tokens":30000,
          "cache_read_input_tokens":500000,"output_tokens":4100},"modelUsage":{"claude-opus-5-5[1m]":{}},
          "permission_denials":[{"tool_name":"Bash","tool_use_id":"a","tool_input":{}}]}
@@ -20,6 +20,7 @@ struct BackendTests {
         #expect(report.outputTokens == 4100)
         #expect(report.model == "claude-opus-5-5")
         #expect(report.deniedTools == ["Bash"])
+        #expect(report.sessionID == "abc")
         #expect(report.summary == "$1.23 · 3 min 12 s · 530k in, 4.1k out · 41 turns · claude-opus-5-5")
     }
 
@@ -33,8 +34,31 @@ struct BackendTests {
     @Test func claudeArguments() {
         let b = ClaudeBackend()
         #expect(b.refreshArguments() == ["-p", "/briefing", "--output-format", "json"])
+        #expect(b.refreshArguments(model: "opus") == ["-p", "/briefing", "--output-format", "json", "--model", "opus"])
         #expect(b.askArguments(question: "Why?", continuing: true) == ["-p", "--continue", "--output-format", "json", "Why?"])
-        #expect(b.askArguments(question: "Why?", continuing: false) == ["-p", "--output-format", "json", "Why?"])
+        #expect(b.askArguments(question: "Why?", continuing: false, model: "sonnet") == ["-p", "--output-format", "json", "--model", "sonnet", "Why?"])
+        #expect(b.defaultModel(for: .refresh) == "opus")
+        #expect(b.defaultModel(for: .ask) == "sonnet")
+        #expect(b.models.first == .cliDefault)
+    }
+
+    @Test func modelChoiceIsSavedPerBackend() {
+        ModelSettings.reset()
+        let claude = ClaudeBackend()
+        let agy = AntigravityBackend()
+        #expect(ModelSettings.model(for: .refresh, backend: claude) == "opus")
+        #expect(ModelSettings.model(for: .ask, backend: agy) == "")
+        ModelSettings.set("haiku", for: .ask, backend: claude)
+        ModelSettings.set("gemini-4-neon-low", for: .ask, backend: agy)
+        #expect(ModelSettings.model(for: .ask, backend: claude) == "haiku")
+        #expect(ModelSettings.model(for: .ask, backend: agy) == "gemini-4-neon-low")
+        // A saved id the backend no longer lists falls back to the default.
+        ModelSettings.set("gone", for: .refresh, backend: claude)
+        #expect(ModelSettings.model(for: .refresh, backend: claude) == "opus")
+        #expect(CodexBackend().models == [.cliDefault])
+        #expect(CodexBackend().refreshArguments(model: "x").prefix(6) == ["exec", "--json", "--sandbox", "workspace-write", "-m", "x"])
+        #expect(AntigravityBackend().askArguments(question: "Q", continuing: false, model: "m") == ["-p", "Q", "--output-format", "json", "--model", "m"])
+        ModelSettings.reset()
     }
 
     @Test func antigravityReadsTheResponseField() {

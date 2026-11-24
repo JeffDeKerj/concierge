@@ -16,6 +16,17 @@ Traps and non-obvious constraints, one bullet each.
   with a stderr warning, until the folder is trusted in `~/.claude.json`. In
   print mode a refused tool is a silent denial: the run "succeeds" with no
   page. The app now lists refused tools from the JSON `permission_denials`.
+- **`--continue` reports the conversation's running total.** `total_cost_usd`
+  of a continued run includes every earlier turn of that session (a $0.22
+  Haiku reply came back as $3.46 after a $3.24 Refresh). The log subtracts the
+  last total of the same `session_id`; anything that reads the CLI's JSON
+  directly must do the same.
+- **Menu views get no environment.** A view inside `.commands { }` that uses
+  `@Environment(AppModel.self)` crashes at launch with an assertion in
+  `EnvironmentValues`; pass the model in as a property instead.
+- **agy's model list is long and changes.** `AntigravityBackend.models` holds
+  five of them, copied from `agy models` on 2026-11-24; the CLI, not the app,
+  is the reference. A model it no longer lists falls back to Default.
 - **agy's `status` is upper-case** (`"SUCCESS"`); compare it case-insensitively.
   Its duration is `duration_seconds`, not milliseconds, and it reports no price.
 - **Refresh overwrites today's page.** The skill writes the same date's file

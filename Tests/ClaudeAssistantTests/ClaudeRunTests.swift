@@ -57,7 +57,7 @@ extension SerialTests {
         model.refresh()
         let done = await Fixture.wait { !model.isRefreshing }
         #expect(done)
-        #expect(model.refreshError == "The generator finished but did not write today's page. It said: args: -p /briefing --output-format json")
+        #expect(model.refreshError == "The generator finished but did not write today's page. It said: args: -p /briefing --output-format json --model opus")
     }
 
     @Test @MainActor func askContinuesTheConversation() async throws {
@@ -70,7 +70,7 @@ extension SerialTests {
         let done = await Fixture.wait { !model.isAsking }
         #expect(done)
         #expect(model.askError == nil)
-        #expect(model.answer == "args: -p --continue --output-format json What is the deadline?")
+        #expect(model.answer == "args: -p --continue --output-format json --model sonnet What is the deadline?")
         #expect(model.question.isEmpty)
         let report = try #require(model.lastAsk)
         #expect(report.costUSD == 0.0125)
@@ -89,7 +89,7 @@ extension SerialTests {
         #expect(done)
         #expect(model.askError == nil)
         let answer = try #require(model.answer)
-        #expect(answer.hasPrefix("fallback: -p --output-format json Regarding the briefing page at "))
+        #expect(answer.hasPrefix("fallback: -p --output-format json --model sonnet Regarding the briefing page at "))
         #expect(answer.hasSuffix("/briefings/2026-11-22.html: Who sent it?"))
     }
 

@@ -39,6 +39,27 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   there is no conversation, the question is sent again as a fresh one,
   prefixed with the path of the page on screen. Refused tools are listed by
   name in the red line.
+- **Dismissed items** (`PageScript.swift`, `DismissStore.swift`): the app injects a
+  script into every page that puts a "×" on each top-level item of the four
+  list sections. A press hides the item and records it in
+  `briefings/dismissed.json` (pretty JSON: key, title, source, section,
+  dismissedAt). Each section shows "n dismissed · Show" to reveal and restore
+  ("↩") them; View > Forget Dismissed Items empties the file. The briefing
+  skill reads the file and leaves those items off the next page unless the
+  source moved since. Keys are the page's `data-key`, else the Gmail thread
+  id in the item's link, else the item's own words.
+- **Model per operation** (`ModelSettings`): the Agent menu has "Model for
+  Refresh" and "Model for Questions", one list per backend, saved in
+  UserDefaults as `model.<refresh|ask>.<backend>`. Claude defaults to Opus
+  for Refresh and Sonnet for questions; a saved id the backend no longer
+  lists falls back to that default. The choice is passed as `--model` (agy
+  too) or `-m` (Codex).
+- **A continued conversation is charged its own share.** `RunReport.sessionID`
+  and `RunLog.Entry.sessionCostUSD` keep the running total the CLI reports;
+  the entry's `costUSD` and the cost line show the difference from the last
+  run of the same session.
+- **Scroll position** (`BriefingWebView`): the same file reloading keeps the
+  reader's place; a different page or the first load starts at the top.
 - **Dark appearance** is forced twice: `NSApplication.shared.appearance` at
   launch and `.preferredColorScheme(.dark)` on the window.
 - **Tests** (`Scripts/test.sh`): Swift Testing, pointed at a throwaway folder

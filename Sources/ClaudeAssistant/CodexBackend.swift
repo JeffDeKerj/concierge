@@ -13,13 +13,20 @@ struct CodexBackend: AgentBackend {
         NSHomeDirectory() + "/.local/bin/codex",
     ]
 
-    func refreshArguments() -> [String] {
-        ["exec", "--json", "--sandbox", "workspace-write", Paths.briefingInstructions]
+    // `codex exec -m <model>` exists, but with no subscription to check the
+    // model names against, the menu offers only the CLI's default for now.
+
+    func refreshArguments(model: String) -> [String] {
+        ["exec", "--json", "--sandbox", "workspace-write"] + modelArguments(model) + [Paths.briefingInstructions]
     }
 
-    func askArguments(question: String, continuing: Bool) -> [String] {
-        if continuing { return ["exec", "resume", "--last", "--json", question] }
-        return ["exec", "--json", question]
+    func askArguments(question: String, continuing: Bool, model: String) -> [String] {
+        if continuing { return ["exec", "resume", "--last", "--json"] + modelArguments(model) + [question] }
+        return ["exec", "--json"] + modelArguments(model) + [question]
+    }
+
+    private func modelArguments(_ model: String) -> [String] {
+        model.isEmpty ? [] : ["-m", model]
     }
 
     func parse(_ output: ProcessOutput) -> RunReport {

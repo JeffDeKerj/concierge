@@ -29,8 +29,14 @@ struct BriefingWebView: NSViewRepresentable {
             decisionHandler(.allow)
         }
 
+        /// Where the previous copy of the same page was scrolled to, restored
+        /// once the new copy has loaded. Nil means start at the top.
+        var pendingScrollY: Double?
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            webView.evaluateJavaScript(PageScript.applyCall(keys: dismissedKeys))
+            let y = pendingScrollY ?? 0
+            pendingScrollY = nil
+            webView.evaluateJavaScript(PageScript.applyCall(keys: dismissedKeys) + " window.scrollTo(0, \(y));")
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -104,12 +110,30 @@ struct BriefingWebView: NSViewRepresentable {
     }
 
     private func load(into webView: WKWebView, context: Context) {
-        context.coordinator.loadedToken = reloadToken
-        context.coordinator.loadedURL = page?.url
-        if let page, let html = try? String(contentsOf: page.url, encoding: .utf8) {
-            webView.loadHTMLString(html, baseURL: Paths.briefings)
+        let coordinator = context.coordinator
+        let samePage = coordinator.loadedURL != nil && coordinator.loadedURL == page?.url
+        coordinator.loadedToken = reloadToken
+        coordinator.loadedURL = page?.url
+        let html: String
+        let base: URL?
+        if let page, let text = try? String(contentsOf: page.url, encoding: .utf8) {
+            html = text
+            base = Paths.briefings
         } else {
-            webView.loadHTMLString(Self.emptyPage, baseURL: nil)
+            html = Self.emptyPage
+            base = nil
+        }
+        guard samePage else {
+            // A different day's page, or the first load: start at the top.
+            coordinator.pendingScrollY = nil
+            webView.loadHTMLString(html, baseURL: base)
+            return
+        }
+        // The same file rewritten (Refresh, or the dismissed list cleared):
+        // keep the reader's place.
+        webView.evaluateJavaScript("window.scrollY") { value, _ in
+            coordinator.pendingScrollY = value as? Double
+            webView.loadHTMLString(html, baseURL: base)
         }
     }
 

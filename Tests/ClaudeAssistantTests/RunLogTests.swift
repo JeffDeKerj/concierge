@@ -27,4 +27,20 @@ struct RunLogTests {
         #expect(log.total(on: Date(timeIntervalSince1970: 0)).runs == 0)
         try? FileManager.default.removeItem(at: dir)
     }
+
+    @Test func continuedConversationIsChargedTheDifference() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("runlog-\(UUID().uuidString)")
+        let log = RunLog(url: dir.appendingPathComponent("runs.jsonl"))
+        var refresh = RunReport(); refresh.costUSD = 3.24; refresh.sessionID = "s1"
+        var ask = RunReport(); ask.costUSD = 3.46; ask.sessionID = "s1"
+        var other = RunReport(); other.costUSD = 0.20; other.sessionID = "s2"
+        #expect(log.append(kind: "refresh", backend: "claude", report: refresh).costUSD == 3.24)
+        let charged = log.append(kind: "ask", backend: "claude", report: ask)
+        #expect(abs((charged.costUSD ?? 0) - 0.22) < 0.0001)
+        #expect(log.append(kind: "ask", backend: "claude", report: other).costUSD == 0.20)
+        let entries = log.entries()
+        #expect(entries[1].sessionCostUSD == 3.46)
+        #expect(abs(log.total().costUSD - 3.66) < 0.0001)
+        try? FileManager.default.removeItem(at: dir)
+    }
 }
