@@ -19,6 +19,22 @@ extension SerialTests {
         #expect(model.page?.isToday == true)
         #expect(model.notice == nil)
         #expect(model.reloadToken > tokenBefore)
+        let report = try #require(model.lastRefresh)
+        #expect(report.text == "Wrote the page.")
+        #expect(report.summary == "$0.01 · 1 s · 5.1k in, 50 out · 3 turns · claude-opus-5-5")
+        #expect(model.today.runs == 1)
+        #expect(abs(model.today.costUSD - 0.0125) < 0.0001)
+    }
+
+    @Test @MainActor func refreshReportsRefusedTools() async throws {
+        try Fixture.reset()
+        try Fixture.stubMode("denied")
+        let model = AppModel()
+        model.refresh()
+        let done = await Fixture.wait { !model.isRefreshing }
+        #expect(done)
+        let error = try #require(model.refreshError)
+        #expect(error.contains("mcp__claude_ai_Gmail__search_threads"))
     }
 
     @Test @MainActor func refreshReportsAFailedGenerator() async throws {
@@ -29,7 +45,7 @@ extension SerialTests {
         let done = await Fixture.wait { !model.isRefreshing }
         #expect(done)
         let error = try #require(model.refreshError)
-        #expect(error.contains("status 1"))
+        #expect(error.hasPrefix("Claude Code failed:"))
         #expect(error.contains("Failed to authenticate: stub"))
         #expect(model.page == nil)
     }
@@ -41,7 +57,7 @@ extension SerialTests {
         model.refresh()
         let done = await Fixture.wait { !model.isRefreshing }
         #expect(done)
-        #expect(model.refreshError == "The generator finished but did not write today's page.")
+        #expect(model.refreshError == "The generator finished but did not write today's page. It said: args: -p /briefing --output-format json")
     }
 
     @Test @MainActor func askContinuesTheConversation() async throws {
@@ -54,8 +70,12 @@ extension SerialTests {
         let done = await Fixture.wait { !model.isAsking }
         #expect(done)
         #expect(model.askError == nil)
-        #expect(model.answer == "args: -p --continue --output-format text What is the deadline?")
+        #expect(model.answer == "args: -p --continue --output-format json What is the deadline?")
         #expect(model.question.isEmpty)
+        let report = try #require(model.lastAsk)
+        #expect(report.costUSD == 0.0125)
+        #expect(report.inputTokens == 5100)
+        #expect(model.today.runs == 1)
     }
 
     @Test @MainActor func askFallsBackToAFreshConversation() async throws {
@@ -69,7 +89,7 @@ extension SerialTests {
         #expect(done)
         #expect(model.askError == nil)
         let answer = try #require(model.answer)
-        #expect(answer.hasPrefix("fallback: -p --output-format text Regarding the briefing page at "))
+        #expect(answer.hasPrefix("fallback: -p --output-format json Regarding the briefing page at "))
         #expect(answer.hasSuffix("/briefings/2026-11-22.html: Who sent it?"))
     }
 

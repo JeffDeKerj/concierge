@@ -25,26 +25,10 @@ enum Paths {
     static func briefing(named day: String) -> URL {
         briefings.appendingPathComponent("\(day).html")
     }
-}
 
-/// Locate the `claude` CLI. A GUI process has no shell PATH, so look in the
-/// known install locations.
-enum ToolLookup {
-    static let claudeCandidates = [
-        NSHomeDirectory() + "/.local/bin/claude",
-        "/opt/homebrew/bin/claude",
-        "/usr/local/bin/claude",
-        NSHomeDirectory() + "/.npm-global/bin/claude",
-        "/usr/bin/claude",
-    ]
-
-    static var claude: URL? {
-        if let path = ProcessInfo.processInfo.environment["CLAUDE_ASSISTANT_CLAUDE_BIN"], !path.isEmpty {
-            return URL(fileURLWithPath: path)
-        }
-        for p in claudeCandidates where FileManager.default.isExecutableFile(atPath: p) {
-            return URL(fileURLWithPath: p)
-        }
-        return nil
+    /// The briefing skill, for backends that have no `/briefing` command of their own.
+    static let briefingSkill = NSHomeDirectory() + "/.claude/skills/briefing/SKILL.md"
+    static var briefingInstructions: String {
+        "Read \(briefingSkill) and follow it to build today's briefing page."
     }
 }

@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 import Observation
 
-/// App state: which page is on screen, the running Refresh, and the follow-up
-/// question and its answer.
+/// App state: which page is on screen, the running Refresh, the follow-up
+/// question and its answer, and what each run cost.
 @MainActor
 @Observable
 final class AppModel {
@@ -14,21 +14,35 @@ final class AppModel {
     /// Bumped whenever the web view must read the file again.
     private(set) var reloadToken = 0
 
+    // The agent
+    var backendID: String = AgentBackends.current().id {
+        didSet { UserDefaults.standard.set(backendID, forKey: AgentBackends.settingsKey) }
+    }
+    var backend: AgentBackend { AgentBackends.named(backendID) }
+    private let log: RunLog
+
     // Refresh
     private(set) var isRefreshing = false
     private(set) var refreshStartedAt: Date?
     private(set) var refreshError: String?
-    private let refreshRunner = ClaudeRunner()
+    private(set) var lastRefresh: RunReport?
+    private let refreshRunner = AgentRunner()
 
     // Follow-up
     var question = ""
     private(set) var answer: String?
     private(set) var isAsking = false
     private(set) var askError: String?
-    private let askRunner = ClaudeRunner()
+    private(set) var lastAsk: RunReport?
+    private let askRunner = AgentRunner()
 
-    init() {
+    /// Cost and count of today's runs, from the log.
+    private(set) var today: (costUSD: Double, runs: Int) = (0, 0)
+
+    init(log: RunLog = RunLog()) {
+        self.log = log
         loadPage()
+        today = log.total()
     }
 
     // MARK: Page
@@ -70,6 +84,7 @@ final class AppModel {
         let today = BriefingLocator.today()
         let target = Paths.briefing(named: today)
         let stampBefore = modificationDate(of: target)
+        let backend = self.backend
 
         Task {
             // Watch the file while the generator runs; it is written before
@@ -78,7 +93,6 @@ final class AppModel {
                 var lastSeen = stampBefore
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(2))
-
                     let now = self.modificationDate(of: target)
                     if now != lastSeen {
                         lastSeen = now
@@ -90,9 +104,14 @@ final class AppModel {
             defer { watcher.cancel() }
 
             do {
-                let out = try await refreshRunner.run(arguments: ["-p", "/briefing"])
-                if out.status != 0 {
-                    refreshError = ClaudeError.failed(status: out.status, output: out.combined).localizedDescription
+                let output = try await refreshRunner.run(backend, arguments: backend.refreshArguments())
+                let report = backend.parse(output)
+                record(kind: "refresh", report)
+                if report.isError {
+                    refreshError = "\(backend.displayName) failed: \(report.errorText)"
+                } else if !report.deniedTools.isEmpty {
+                    refreshError = "Some tools were refused: \(report.deniedTools.joined(separator: ", ")). "
+                        + "Allow them in .claude/settings.json."
                 }
             } catch {
                 refreshError = error.localizedDescription
@@ -103,7 +122,9 @@ final class AppModel {
                 loadPage()
                 reloadToken += 1
             } else if refreshError == nil {
+                let said = lastRefresh?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 refreshError = "The generator finished but did not write today's page."
+                    + (said.isEmpty ? "" : " It said: \(said)")
             }
             isRefreshing = false
             refreshStartedAt = nil
@@ -128,19 +149,23 @@ final class AppModel {
         isAsking = true
         askError = nil
         answer = nil
+        let backend = self.backend
 
         Task {
             do {
-                var out = try await askRunner.run(arguments: ["-p", "--continue", "--output-format", "text", q])
-                if out.status != 0, out.combined.localizedCaseInsensitiveContains("no conversation") {
+                var output = try await askRunner.run(backend, arguments: backend.askArguments(question: q, continuing: true))
+                var report = backend.parse(output)
+                if backend.isNoConversation(report) {
                     let intro = page.map { "Regarding the briefing page at \($0.url.path): " } ?? ""
-                    out = try await askRunner.run(arguments: ["-p", "--output-format", "text", intro + q])
+                    output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + q, continuing: false))
+                    report = backend.parse(output)
                 }
-                if out.status == 0 {
-                    answer = out.text.isEmpty ? "(no reply)" : out.text
-                    question = ""
+                record(kind: "ask", report)
+                if report.isError {
+                    askError = "\(backend.displayName) failed: \(report.errorText)"
                 } else {
-                    askError = ClaudeError.failed(status: out.status, output: out.combined).localizedDescription
+                    answer = report.text.isEmpty ? "(no reply)" : report.text
+                    question = ""
                 }
             } catch {
                 askError = error.localizedDescription
@@ -151,5 +176,13 @@ final class AppModel {
 
     func cancelAsk() {
         askRunner.stop()
+    }
+
+    // MARK: Cost
+
+    private func record(kind: String, _ report: RunReport) {
+        if kind == "refresh" { lastRefresh = report } else { lastAsk = report }
+        log.append(kind: kind, backend: backendID, report: report)
+        today = log.total()
     }
 }
