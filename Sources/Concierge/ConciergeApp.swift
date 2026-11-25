@@ -6,6 +6,8 @@ struct ConciergeApp: App {
     @State private var model = AppModel()
 
     init() {
+        // launchd starts the app with --tick to run the scheduled jobs: no window.
+        if CommandLine.arguments.contains(TickLauncher.flag) { exit(TickLauncher.run()) }
         // Dark everywhere, including AppKit chrome the SwiftUI scheme does not reach.
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
     }

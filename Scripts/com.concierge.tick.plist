@@ -3,8 +3,9 @@
 <plist version="1.0"><dict>
   <key>Label</key><string>com.concierge.tick</string>
   <key>ProgramArguments</key><array>
-    <string>/usr/bin/python3</string><string>-I</string>
-    <string>/Users/jeffdekerj/code/swift/concierge/Scripts/tick.py</string>
+    <!-- The app's binary, so macOS applies Concierge's Full Disk Access (WhatsApp). -->
+    <string>/Users/jeffdekerj/Applications/Concierge.app/Contents/MacOS/Concierge</string>
+    <string>--tick</string>
   </array>
   <key>StartInterval</key><integer>900</integer>
   <key>StandardOutPath</key><string>/Users/jeffdekerj/code/swift/concierge/briefings/state/tick.log</string>

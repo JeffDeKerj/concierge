@@ -72,7 +72,9 @@ def due_jobs(s: dict, state: dict, now: dt.datetime, agenda: list) -> list[tuple
 
 def run(kind: str, prompt: str, model: str) -> None:
     try:
-        out = subprocess.run([CLAUDE, "-p", prompt, "--output-format", "json", "--model", model],
+        out = subprocess.run([CLAUDE, "-p", prompt, "--output-format", "json", "--model", model,
+                              # Unsaved, so the app's question box keeps resuming its own conversation.
+                              "--no-session-persistence"],
                              cwd=ROOT, capture_output=True, text=True, timeout=1200)
         report = json.loads(out.stdout or "{}")
     except (subprocess.SubprocessError, ValueError, OSError) as exc:
