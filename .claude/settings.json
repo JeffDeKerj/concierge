@@ -19,7 +19,8 @@
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new:*)",
       "Bash(/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new:*)",
       "Bash(ls:*)",
-      "Bash(date:*)"
+      "Bash(date:*)",
+      "Bash(printf:*)"
     ]
   }
 }

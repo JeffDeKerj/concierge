@@ -43,6 +43,9 @@ enum PageScript {
         '.copy-btn { margin-left: 8px; font-size: 12px; cursor: pointer; color: var(--accent, #7aa2f7); }',
         '#since-morning li { white-space: pre-line; }',
         '#since-morning li.gone { display: none; }',
+        'li.handled { opacity: .5; }',
+        'li.handled b.t { text-decoration: line-through; }',
+        '.handled-note { color: var(--low, #9ece6a); font-size: 12px; margin-top: 4px; }',
         'li.dismissable .dismiss-btn:hover { color: var(--ink, #e6e8ee); border-color: var(--ink-faint, #6b7280); }',
         'li.dismissed { display: none; }',
         'section.show-dismissed li.dismissed { display: block; opacity: .45; }',
@@ -195,10 +198,34 @@ enum PageScript {
       addCopyButtons(document);
 
       // Today's daytime findings, newest first, above the first section.
+      // Items the owner dealt with after the page was built: greyed, struck, with when.
+      function markHandled(list) {
+        document.querySelectorAll('li.handled').forEach(function (li) { li.classList.remove('handled'); });
+        document.querySelectorAll('.handled-note').forEach(function (n) { n.remove(); });
+        list.forEach(function (u) {
+          if (u.kind !== 'handled' || !u.resolves) { return; }
+          document.querySelectorAll('li[data-key]').forEach(function (li) {
+            if (li.dataset.key !== u.resolves) { return; }
+            li.classList.add('handled');
+            var n = document.createElement('div');
+            n.className = 'handled-note';
+            n.textContent = 'Handled \\u00B7 ' + (u.text || u.title || '') + (u.time ? ' \\u00B7 ' + u.time : '');
+            li.appendChild(n);
+          });
+        });
+      }
+
       function showUpdates(list) {
         var old = document.getElementById('since-morning');
         if (old) { old.remove(); }
-        if (!list || !list.length) { return; }
+        list = list || [];
+        var handled = list.filter(function (u) { return u.kind === 'handled'; });
+        list = list.filter(function (u) { return u.kind !== 'handled'; });
+        if (list.length) { buildUpdates(list); }
+        markHandled(handled);
+      }
+
+      function buildUpdates(list) {
         var hidden = {};
         (window.briefing._hidden || []).forEach(function (k) { hidden[k] = true; });
         var sec = document.createElement('section');
