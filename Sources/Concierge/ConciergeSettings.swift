@@ -32,6 +32,8 @@ struct ConciergeSettings: Codable, Equatable {
     var quietInEvents = true
     /// Local "YYYY-MM-DDTHH:MM": nothing is said before then.
     var silenceUntil: String? = nil
+    /// After saying an alert, listen a few seconds for a spoken reply.
+    var listenAfter = true
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
 
@@ -145,6 +147,7 @@ struct SettingsView: View {
                     TextField("To", text: $s.speakTo).labelsHidden().frame(width: 56)
                 }
                 Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
+                Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 HStack {
                     if s.isSilenced() {
                         Text("Silenced until \(s.silenceUntil ?? "")".replacingOccurrences(of: "T", with: " "))

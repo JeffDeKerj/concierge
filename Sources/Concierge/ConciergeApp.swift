@@ -3,7 +3,8 @@ import SwiftUI
 
 @main
 struct ConciergeApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+    @State private var conversation: Conversation
 
     init() {
         // launchd starts the app with --tick to run the scheduled jobs: no window.
@@ -12,12 +13,25 @@ struct ConciergeApp: App {
         if CommandLine.arguments.contains(Speaker.flag) { exit(Speaker.runFromCommandLine(CommandLine.arguments)) }
         // Dark everywhere, including AppKit chrome the SwiftUI scheme does not reach.
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+        let model = AppModel()
+        let conversation = Conversation(model: model)
+        _model = State(initialValue: model)
+        _conversation = State(initialValue: conversation)
+        // Alerts from the job runner, said here so Concierge can hear the reply.
+        DistributedNotificationCenter.default().addObserver(
+            forName: Speaker.alertNotification, object: nil, queue: .main) { note in
+            guard let text = note.userInfo?["text"] as? String else { return }
+            MainActor.assumeIsolated {
+                conversation.alert(text, listen: ConciergeSettings.load().listenAfter)
+            }
+        }
     }
 
     var body: some Scene {
         WindowGroup("Concierge") {
             ContentView()
                 .environment(model)
+                .environment(conversation)
                 .preferredColorScheme(.dark)
                 .frame(minWidth: 560, minHeight: 600)
         }

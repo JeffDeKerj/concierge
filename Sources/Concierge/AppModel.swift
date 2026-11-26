@@ -200,31 +200,47 @@ final class AppModel {
         let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !isAsking else { return }
         isAsking = true
+        Task { @MainActor in _ = await perform(q, prompt: nil) }
+    }
+
+    /// Asks and returns the answer, or nil on failure or when a question is
+    /// already running. `prompt` is what the model reads when it differs from
+    /// what the owner said (spoken questions ask for a short answer).
+    @MainActor @discardableResult
+    func ask(_ q: String, prompt: String? = nil) async -> String? {
+        guard !isAsking else { return nil }
+        isAsking = true
+        return await perform(q, prompt: prompt)
+    }
+
+    @MainActor
+    private func perform(_ q: String, prompt: String?) async -> String? {
         askError = nil
         answer = nil
+        question = q
         let backend = self.backend
         let model = askModel
-
-        Task {
-            do {
-                var output = try await askRunner.run(backend, arguments: backend.askArguments(question: q, continuing: true, model: model))
-                var report = backend.parse(output)
-                if backend.isNoConversation(report) {
-                    let intro = page.map { "Regarding the briefing page at \($0.url.path): " } ?? ""
-                    output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + q, continuing: false, model: model))
-                    report = backend.parse(output)
-                }
-                record(kind: "ask", report)
-                if report.isError {
-                    askError = "\(backend.displayName) failed: \(report.errorText)"
-                } else {
-                    answer = report.text.isEmpty ? "(no reply)" : report.text
-                    question = ""
-                }
-            } catch {
-                askError = error.localizedDescription
+        let sent = prompt ?? q
+        defer { isAsking = false }
+        do {
+            var output = try await askRunner.run(backend, arguments: backend.askArguments(question: sent, continuing: true, model: model))
+            var report = backend.parse(output)
+            if backend.isNoConversation(report) {
+                let intro = page.map { "Regarding the briefing page at \($0.url.path): " } ?? ""
+                output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + sent, continuing: false, model: model))
+                report = backend.parse(output)
             }
-            isAsking = false
+            record(kind: "ask", report)
+            if report.isError {
+                askError = "\(backend.displayName) failed: \(report.errorText)"
+                return nil
+            }
+            answer = report.text.isEmpty ? "(no reply)" : report.text
+            question = ""
+            return report.text
+        } catch {
+            askError = error.localizedDescription
+            return nil
         }
     }
 

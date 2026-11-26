@@ -41,10 +41,12 @@ struct ContentView: View {
 
             Divider()
             CostLine()
+            VoiceStrip()
             FollowUpPanel()
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
         .toolbar {
+            ToolbarItem(placement: .primaryAction) { TalkButton() }
             ToolbarItem(placement: .primaryAction) { SilenceButton() }
             ToolbarItem(placement: .navigation) {
                 if let page = model.page {
@@ -212,5 +214,56 @@ struct SilenceButton: View {
     private func change(_ edit: (inout ConciergeSettings) -> Void) {
         ConciergeSettings.update(edit)
         s = ConciergeSettings.load()
+    }
+}
+
+/// The microphone in the toolbar: talk to Concierge, or stop talking.
+struct TalkButton: View {
+    @Environment(Conversation.self) private var talk
+
+    var body: some View {
+        Button {
+            talk.isActive ? talk.stop() : talk.start()
+        } label: {
+            Label(talk.isActive ? "Stop talking" : "Talk",
+                  systemImage: talk.isActive ? "mic.fill" : "mic")
+        }
+        .foregroundStyle(talk.isActive ? Color.accentColor : Color.primary)
+        .help(talk.isActive ? "Stop the conversation" : "Talk to Concierge (⌘T)")
+        .keyboardShortcut("t", modifiers: .command)
+        .accessibilityIdentifier("toolbar.talk")
+    }
+}
+
+/// One line above the question box while a spoken conversation runs.
+struct VoiceStrip: View {
+    @Environment(Conversation.self) private var talk
+
+    var body: some View {
+        if talk.isActive || talk.error != nil {
+            HStack(spacing: 8) {
+                switch talk.state {
+                case .listening(let words):
+                    Image(systemName: "waveform").foregroundStyle(Color.accentColor)
+                    Text(words.isEmpty ? "Listening…" : words).lineLimit(2)
+                case .thinking:
+                    ProgressView().controlSize(.small)
+                    Text("Thinking…")
+                case .speaking:
+                    Image(systemName: "speaker.wave.2.fill").foregroundStyle(Color.accentColor)
+                    Text("Speaking…")
+                case .idle:
+                    Text(talk.error ?? "").foregroundStyle(.red).textSelection(.enabled)
+                }
+                Spacer()
+                if talk.isActive {
+                    Button("Stop") { talk.stop() }.accessibilityIdentifier("voice.stop")
+                }
+            }
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .accessibilityIdentifier("voice.strip")
+        }
     }
 }

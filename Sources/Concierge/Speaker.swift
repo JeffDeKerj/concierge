@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 
 /// Concierge's voice: the Mac's own speech voices, so nothing said leaves the Mac.
@@ -6,6 +7,8 @@ import AVFoundation
 /// the voice chosen in Settings is the one heard, with no second voice list.
 enum Speaker {
     static let flag = "--say"
+    /// Posted by `--say` to a running Concierge, which then speaks and listens.
+    static let alertNotification = Notification.Name("local.jeffdekerj.concierge.alert")
 
     /// English voices, best quality first. Premium and Enhanced voices appear
     /// here once downloaded in System Settings › Accessibility › Spoken Content.
@@ -48,6 +51,15 @@ enum Speaker {
     /// `Concierge --say <voice id> <text>`: speaks and returns when done.
     static func runFromCommandLine(_ args: [String]) -> Int32 {
         guard let i = args.firstIndex(of: flag), args.count > i + 2 else { return 2 }
+        // A running window speaks instead, so it can listen for a reply.
+        if let id = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: {
+               $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && $0.activationPolicy == .regular
+           }) {
+            DistributedNotificationCenter.default().postNotificationName(
+                alertNotification, object: nil, userInfo: ["text": args[i + 2]], deliverImmediately: true)
+            return 0
+        }
         let done = Finished()
         let synth = AVSpeechSynthesizer()
         synth.delegate = done

@@ -42,6 +42,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSRequiresAquaSystemAppearance</key><false/>
+    <key>NSMicrophoneUsageDescription</key><string>Concierge listens when you talk to it, and for a few seconds after it says an alert.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>Concierge turns what you say into a question, on this Mac.</string>
 </dict>
 </plist>
 PLIST
