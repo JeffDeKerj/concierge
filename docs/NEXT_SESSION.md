@@ -24,10 +24,10 @@ count (`grep -l -- "stopped by a safety classifier"
 
 1. **Check by voice.** These need the owner talking: the beak moving with
    Concierge's voice, the heard words under the owl, the owl in the screen
-   corner when called with the window hidden, that saying "Nestor" wakes it
-   (the recogniser may spell the name its own way; `CalledName` allows one
-   letter of difference), and that talking over it still stops it. The owner
-   confirmed on 2026-11-26 that a click on the owl works with no bip.
+   corner when called with the window hidden, and that talking over it
+   still stops it. The owner
+   confirmed on 2026-11-26 that a click on the owl works with no bip and
+   that "Nestor, what's on tomorrow?" is answered.
 2. **Judge the Sonnet trial around 2026-12-03.** Compare filter stops and page
    quality with the Opus week. Keep Sonnet, or go back by deleting `model:` in
    `~/.claude/scheduled-tasks/morning-briefing/SKILL.md` and running
