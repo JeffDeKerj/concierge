@@ -79,6 +79,17 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   Speaking rules (hours, events, silence) are in `tick.py` and tested in
   `Tests/python`. Settings keys: `speak`, `voice`, `speakFrom`, `speakTo`,
   `quietInEvents`, `silenceUntil`, `listenAfter`, `interruptible`, `wakeWord`.
+- **Face.** `Face.swift` holds the rules as plain functions (expression from
+  the conversation state, a pose per expression, blink, gaze, picture rate);
+  `FaceView.swift` draws a pose in one of nine styles (`Face.Style`, default
+  owl, Settings key `face`). The resting face is `FaceButton` in the top bar
+  (`toolbar.talk`, Cmd-T); `StagedFace` is the big one that glides to the
+  middle during a conversation; `FacePanel.swift` shows it in a screen corner
+  when the window is out of sight (Settings key `floatingFace`). The mouth
+  follows `VoiceIO.level(at:)`. `FACE_SHEET=<file.png> Scripts/test.sh
+  --filter Face` draws every style in every expression into a picture.
+- **Window commands by voice**: `Conversation.windowCommand` ("show your
+  face", "hide"), handled before the model is asked.
 - **Scheduled jobs run through the app**: launchd starts
   `Concierge --tick`, so Concierge's Full Disk Access covers WhatsApp, and
   `tick.py` runs with Homebrew on PATH and `--no-session-persistence`.

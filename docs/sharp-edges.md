@@ -80,3 +80,16 @@ Traps and non-obvious constraints, one bullet each.
   read back; `log show --last 5m --info --predicate 'subsystem == "local.jeffdekerj.concierge"'`.
 - **A briefing run started by hand is not in `runs.jsonl`.** The next question
   that continues it is charged the whole conversation.
+- **The recogniser gives up when another listener lets go of the microphone.**
+  As the wake listener stops, a conversation's first turn ends at once with
+  "No speech detected". `VoiceIO.listen` starts a fresh turn until its own
+  wait is over. The wake listener may meet the same thing the other way round.
+- **A face drawn by SwiftUI in the top bar is expensive.** Every new picture
+  makes the toolbar work out its layout again: 9% CPU at rest. The resting
+  face is an AppKit view that sets its layer's picture (`FacePicture`). Only
+  the face that glides is drawn by SwiftUI, because an AppKit view inside
+  SwiftUI jumps to its new place where a plain SwiftUI view travels.
+- **Text in a `Canvas` at a new size for every picture is slow** (the sleeping
+  face's letters took most of 30% CPU). Draw such things as lines.
+- **A window that is covered shows a blank page in a screenshot**, and the
+  face stops drawing by design. Bring the app forward before judging either.

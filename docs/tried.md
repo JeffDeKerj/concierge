@@ -12,3 +12,14 @@ result, why it fell short, what would change the verdict, and where the detail i
   accessibility identifiers (`toolbar.refresh`, `followup.input`, …) and a
   `--refresh` launch flag, and the logic is covered by tests against a stub.
   Detail: [sessions/2026-11-24.md](sessions/2026-11-24.md).
+
+- **2026-11-26: drawing the resting face with SwiftUI.** A `TimelineView`
+  with a `Canvas` in the window cost 8% CPU at 30 pictures a second and still
+  5% at 8, because each picture made the whole window lay itself out. The
+  same view in its own `NSHostingView` cost 0.5% beside the question box, but
+  9% once the face moved to the top bar, where each picture made the toolbar
+  measure its items again. It fell short because the cost is in the layout
+  around the picture, not in the drawing. Kept instead: an AppKit view that
+  sets its layer's picture, about 1% with the wake word on. Verdict changes
+  if the face leaves the top bar for a place inside the page, where the
+  hosting view was cheap. Detail: [sessions/2026-11-26b.md](sessions/2026-11-26b.md).
