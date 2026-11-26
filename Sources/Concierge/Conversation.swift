@@ -24,14 +24,18 @@ final class Conversation {
     static let willShowWindow = Notification.Name("local.jeffdekerj.concierge.willShowWindow")
 
     private let model: AppModel
-    private let io = VoiceIO()
+    private let io: VoiceIO
     /// For alerts said without listening afterwards.
     private let voice = SpokenTurn()
     private var loop: Task<Void, Never>?
     /// The most turns in one conversation, as a guard against a runaway loop.
     private let maxTurns = 8
 
-    init(model: AppModel) { self.model = model }
+    /// `io` is shared with the wake-word listener, so both use one microphone session.
+    init(model: AppModel, io: VoiceIO? = nil) {
+        self.model = model
+        self.io = io ?? VoiceIO()
+    }
 
     /// Starts a conversation. `opening` is said first: an alert Concierge
     /// starts the conversation with. `context` goes with the first question
@@ -67,19 +71,19 @@ final class Conversation {
 
     func stop() {
         loop?.cancel()
-        io.shutdown()
+        io.endConversation()
         voice.stop()
         state = .idle
     }
 
     private func run(opening: String?, context: String?, quickReply: Bool, firstQuestion: String?) async {
         defer {
-            io.shutdown()
+            io.endConversation()
             state = .idle
         }
         do {
             try await VoiceIO.authorise()
-            try io.start()
+            try io.hold(.talk)
         } catch {
             self.error = error.localizedDescription
             return

@@ -80,10 +80,15 @@ Traps and non-obvious constraints, one bullet each.
   read back; `log show --last 5m --info --predicate 'subsystem == "local.jeffdekerj.concierge"'`.
 - **A briefing run started by hand is not in `runs.jsonl`.** The next question
   that continues it is charged the whole conversation.
-- **The recogniser gives up when another listener lets go of the microphone.**
-  As the wake listener stops, a conversation's first turn ends at once with
+- **The recogniser gives up when another recognition task ends.** As the wake
+  listener cancels its request, a conversation's first turn ends at once with
   "No speech detected". `VoiceIO.listen` starts a fresh turn until its own
-  wait is over. The wake listener may meet the same thing the other way round.
+  wait is over.
+- **Starting or stopping the voice-processing engine rewrites the output
+  volume** for a moment, and the owner's Shokz headset beeps at that. So the
+  engine runs once for the wake word and the conversation together
+  (`VoiceIO.hold`). Voice processing left working all day costs a quarter of
+  a core; it is bypassed outside a conversation.
 - **A face drawn by SwiftUI in the top bar is expensive.** Every new picture
   makes the toolbar work out its layout again: 9% CPU at rest. The resting
   face is an AppKit view that sets its layer's picture (`FacePicture`). Only

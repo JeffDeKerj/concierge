@@ -75,7 +75,8 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   Enhanced) and speaks for `--say`; a running window takes the alert over a
   distributed notification so it can listen afterwards. `Conversation.swift`
   runs the spoken loop on `VoiceIO.swift` (one engine, echo cancellation,
-  interrupting); `WakeListener.swift` waits for "Concierge", on-device only.
+  interrupting); `WakeListener.swift` waits for "Concierge", on-device only,
+  through the same engine, which it holds open while the wake word is on.
   Speaking rules (hours, events, silence) are in `tick.py` and tested in
   `Tests/python`. Settings keys: `speak`, `voice`, `speakFrom`, `speakTo`,
   `quietInEvents`, `silenceUntil`, `listenAfter`, `interruptible`, `wakeWord`.

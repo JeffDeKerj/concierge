@@ -4,11 +4,16 @@ import Speech
 
 private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "voice")
 
-/// The microphone and the voice of a spoken conversation, on one audio
-/// engine with the Mac's voice processing on. Speech is played through the
-/// same engine, so its echo cancellation removes Concierge's own voice from
-/// the microphone, and Concierge can listen while it talks. Speech
-/// recognition stays on the Mac when the recogniser supports it.
+/// The microphone and the voice of Concierge, on one audio engine with the
+/// Mac's voice processing on. Speech is played through the same engine, so
+/// its echo cancellation removes Concierge's own voice from the microphone,
+/// and Concierge can listen while it talks. Speech recognition stays on the
+/// Mac when the recogniser supports it.
+///
+/// The wake-word listener and the conversation share this one engine. It
+/// runs for as long as either holds it, so a conversation that starts while
+/// the wake word is on switches nothing on or off. Each switch made macOS
+/// rewrite the output volume, and a headset beeps at that.
 @MainActor
 final class VoiceIO {
     enum Failure: LocalizedError {
@@ -40,6 +45,14 @@ final class VoiceIO {
     private var turnStarted = Date()
     private var turnOver = false
     private var running = false
+    /// Who needs the engine to run.
+    enum Hold: Hashable { case wake, talk }
+    private var holds: Set<Hold> = []
+    private var deviceChanges: NSObjectProtocol?
+    /// What the wake-word listener hears, beside the conversation's own feed.
+    private let wakeFeed = Feed()
+    /// Microphone buffers and the loudest sample since last asked, for the wake listener's log.
+    private let meter = Locked<(buffers: Int, peak: Float)>((0, 0))
     /// Counts turns, so a late answer from a cancelled turn is ignored.
     private var turnNumber = 0
     /// How loud the sentence being said is, step by step, and when it began.
@@ -55,7 +68,41 @@ final class VoiceIO {
         guard await AVCaptureDevice.requestAccess(for: .audio) else { throw Failure.notAllowed("the microphone") }
     }
 
-    func start() throws {
+    /// Keeps the engine running for `who`, starting it when nobody held it.
+    func hold(_ who: Hold) throws {
+        if !running { try startEngine() }
+        holds.insert(who)
+        setProcessing()
+    }
+
+    /// Lets go for `who`; the engine stops when nobody holds it any more.
+    func release(_ who: Hold) {
+        holds.remove(who)
+        if holds.isEmpty { stopEngine() } else { setProcessing() }
+    }
+
+    /// Echo cancellation and noise removal work only during a conversation.
+    /// While the engine just waits for the wake word they are bypassed: left
+    /// on, they took a quarter of a processor core all day. Bypassing keeps
+    /// the engine as it is, so nothing is switched and the volume stays put.
+    private func setProcessing() {
+        guard running else { return }
+        engine.inputNode.isVoiceProcessingBypassed = !holds.contains(.talk)
+    }
+
+    /// The recognition request that gets the microphone for the wake word, or nil for none.
+    func setWakeRequest(_ request: SFSpeechAudioBufferRecognitionRequest?) {
+        wakeFeed.set(request)
+    }
+
+    /// Microphone buffers and the loudest sample (0 to 1) since the last call.
+    func takeMeter() -> (buffers: Int, peak: Float) {
+        meter.withLock { m in defer { m = (0, 0) }; return m }
+    }
+
+    var inputFormat: String { engine.inputNode.outputFormat(forBus: 0).description }
+
+    private func startEngine() throws {
         guard !running else { return }
         guard let r = SFSpeechRecognizer(locale: Locale(identifier: "en-GB")) ?? SFSpeechRecognizer(),
               r.isAvailable else { throw Failure.unavailable }
@@ -69,26 +116,77 @@ final class VoiceIO {
         // Voice processing would otherwise turn other sound on the Mac down.
         input.voiceProcessingOtherAudioDuckingConfiguration =
             AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
-        engine.attach(player)
+        if player.engine == nil { engine.attach(player) }
         engine.connect(player, to: engine.mainMixerNode, format: nil)
-        let feed = self.feed
+        let feed = self.feed, wakeFeed = self.wakeFeed, meter = self.meter
+        input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
-            feed.append(buffer)
+            let mono = Self.firstChannel(of: buffer)
+            feed.append(mono)
+            wakeFeed.append(mono)
+            let peak = Self.peak(of: mono)
+            meter.withLock { $0 = ($0.buffers + 1, max($0.peak, peak)) }
         }
         engine.prepare()
         try engine.start()
         running = true
+        if deviceChanges == nil {
+            // A headset that connects or drops stops the engine: start it again on the new device.
+            deviceChanges = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.restartAfterDeviceChange() }
+            }
+        }
     }
 
-    func shutdown() {
-        endTurn()
-        synth.stopSpeaking(at: .immediate)
-        player.stop()
+    private func stopEngine() {
         guard running else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         try? engine.inputNode.setVoiceProcessingEnabled(false)
         running = false
+    }
+
+    private func restartAfterDeviceChange() {
+        guard running else { return }
+        log.info("the sound devices changed: starting the engine again")
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        running = false
+        do {
+            try startEngine()
+        } catch {
+            log.error("engine did not start again: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Ends the conversation's part: its turn and its voice. The engine
+    /// goes on when the wake word still holds it.
+    func endConversation() {
+        endTurn()
+        synth.stopSpeaking(at: .immediate)
+        player.stop()
+        release(.talk)
+    }
+
+    /// With voice processing on, the input has several channels and only the
+    /// first carries the cleaned-up voice.
+    nonisolated private static func firstChannel(of buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        guard buffer.format.channelCount > 1, let source = buffer.floatChannelData,
+              let format = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1),
+              let mono = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: buffer.frameLength),
+              let target = mono.floatChannelData else { return buffer }
+        mono.frameLength = buffer.frameLength
+        target[0].update(from: source[0], count: Int(buffer.frameLength))
+        return mono
+    }
+
+    /// The loudest sample of a buffer, 0 to 1.
+    nonisolated static func peak(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let data = buffer.floatChannelData?[0] else { return 0 }
+        var m: Float = 0
+        for i in 0..<Int(buffer.frameLength) { m = max(m, abs(data[i])) }
+        return m
     }
 
     // MARK: Speaking
@@ -296,21 +394,8 @@ private final class Feed: @unchecked Sendable {
     private var request: SFSpeechAudioBufferRecognitionRequest?
 
     func append(_ buffer: AVAudioPCMBuffer) {
-        let mono = Self.firstChannel(of: buffer)
         lock.lock(); defer { lock.unlock() }
-        request?.append(mono)
-    }
-
-    /// With voice processing on, the input has several channels and only the
-    /// first carries the cleaned-up voice.
-    private static func firstChannel(of buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
-        guard buffer.format.channelCount > 1, let source = buffer.floatChannelData,
-              let format = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1),
-              let mono = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: buffer.frameLength),
-              let target = mono.floatChannelData else { return buffer }
-        mono.frameLength = buffer.frameLength
-        target[0].update(from: source[0], count: Int(buffer.frameLength))
-        return mono
+        request?.append(buffer)
     }
 
     /// Sets the new request and returns the old one.

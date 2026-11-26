@@ -23,3 +23,13 @@ result, why it fell short, what would change the verdict, and where the detail i
   sets its layer's picture, about 1% with the wake word on. Verdict changes
   if the face leaves the top bar for a place inside the page, where the
   hosting view was cheap. Detail: [sessions/2026-11-26b.md](sessions/2026-11-26b.md).
+
+- **2026-11-26: voice processing switched on all day.** To stop the headset's
+  bip, the wake word and the conversation were put on one always-running
+  engine with echo cancellation on. The bip went, but the app used 24% of a
+  core at rest: the Mac's voice processor runs a noise-removal model on every
+  buffer. Kept instead: the same engine with voice processing bypassed
+  outside a conversation, 2.3% at rest and no volume change. Verdict changes
+  only if Apple makes the processor cheap. Detail:
+  [sessions/2026-11-26b.md](sessions/2026-11-26b.md).
+

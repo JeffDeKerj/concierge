@@ -17,10 +17,12 @@ struct ConciergeApp: App {
         // Dark everywhere, including AppKit chrome the SwiftUI scheme does not reach.
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
         let model = AppModel()
-        let conversation = Conversation(model: model)
+        // One microphone session for the wake word and the conversation.
+        let io = VoiceIO()
+        let conversation = Conversation(model: model, io: io)
         _model = State(initialValue: model)
         _conversation = State(initialValue: conversation)
-        let wake = WakeListener(conversation: conversation)
+        let wake = WakeListener(conversation: conversation, io: io)
         _wake = State(initialValue: wake)
         wake.run()
         let face = FacePanel(conversation: conversation)
