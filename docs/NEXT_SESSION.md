@@ -24,8 +24,8 @@ count (`grep -l -- "stopped by a safety classifier"
    Concierge's voice, the heard words under the owl, the owl in the screen
    corner when called with the window hidden, and, since the wake word and
    the conversation share one microphone session, that the wake word still
-   answers, that talking over Concierge still stops it, and that the headset
-   no longer bips when a conversation starts or ends.
+   answers and that talking over Concierge still stops it. The owner
+   confirmed on 2026-11-26 that a click on the owl works with no bip.
 2. **Judge the Sonnet trial around 2026-12-03.** Compare filter stops and page
    quality with the Opus week. Keep Sonnet, or go back by deleting `model:` in
    `~/.claude/scheduled-tasks/morning-briefing/SKILL.md` and running
