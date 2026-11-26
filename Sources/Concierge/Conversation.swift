@@ -105,7 +105,9 @@ final class Conversation {
                 ? firstQuestion
                 : await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
             guard !Task.isCancelled, let heard else { return }
-            switch Self.windowCommand(heard) {
+            // "Thanks, Nestor" is a goodbye, and "Nestor, hide" a command.
+            let said = CalledName.removed(from: heard, name: Brand.name)
+            switch Self.windowCommand(said) {
             case .show:
                 Self.showWindow()
                 await speak("Here I am.", settings)
@@ -118,7 +120,7 @@ final class Conversation {
             case nil:
                 break
             }
-            if Self.isGoodbye(heard) {
+            if Self.isGoodbye(said) {
                 state = .speaking
                 _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
                 return

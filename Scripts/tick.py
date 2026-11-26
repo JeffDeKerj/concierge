@@ -30,6 +30,7 @@ DEFAULTS = dict(pausedOn=None, morning=True, checks=True, checkEveryMinutes=120,
                 notifyMac=True, notifyPhone=True, checkModel="haiku", prepModel="sonnet",
                 wrapupModel="sonnet", speak=True, voice="", speakFrom="08:30", speakTo="21:00",
                 quietInEvents=True, silenceUntil=None)
+NAME = "Nestor"  # what the owner calls it: the title of every notification
 APP = os.environ.get("CONCIERGE_APP")  # set by the app's --tick launcher
 
 
@@ -142,13 +143,13 @@ def notify(s: dict, entries: list, now: dt.datetime | None = None, agenda: list 
            speaker=None) -> None:
     entries = [e for e in entries if e.get("notify")]
     for e in entries:
-        title = str(e.get("title", "Concierge"))[:120]
+        title = str(e.get("title", NAME))[:120]
         if s["notifyMac"]:
-            script = f"display notification {json.dumps(title)} with title \"Concierge\""
+            script = f"display notification {json.dumps(title)} with title {json.dumps(NAME)}"
             subprocess.run(["osascript", "-e", script], capture_output=True)
         if s["notifyPhone"]:
             try:
-                req = urllib.request.Request(NTFY, data=title.encode(), headers={"Title": "Concierge"})
+                req = urllib.request.Request(NTFY, data=title.encode(), headers={"Title": NAME})
                 urllib.request.urlopen(req, timeout=10)
             except OSError:
                 pass

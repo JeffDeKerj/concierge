@@ -89,6 +89,13 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   when the window is out of sight (Settings key `floatingFace`). The mouth
   follows `VoiceIO.level(at:)`. `FACE_SHEET=<file.png> Scripts/test.sh
   --filter Face` draws every style in every expression into a picture.
+- **The name is Nestor** in everything the owner sees or says: `Brand.name`
+  for the window title, tooltips and the wake word, `DISPLAY_NAME` in
+  `Scripts/make_app.sh` for the menu bar and Dock, `NAME` in `Scripts/tick.py`
+  for notifications, and the greeting in the briefing skill's `example.html`.
+  The app file, executable, bundle identifier, repository and skills stay
+  "Concierge", so the scheduler's path and the privacy grants hold.
+  `CalledName` finds the name in what was heard.
 - **Window commands by voice**: `Conversation.windowCommand` ("show your
   face", "hide"), handled before the model is asked.
 - **Scheduled jobs run through the app**: launchd starts

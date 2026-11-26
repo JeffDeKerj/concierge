@@ -128,7 +128,7 @@ private struct FloatingFace: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Open Concierge")
+            .help("Open \(Brand.name)")
             Text(caption)
                 .font(.callout)
                 .foregroundStyle(.white)

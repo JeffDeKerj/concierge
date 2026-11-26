@@ -39,7 +39,7 @@ struct ConciergeApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Concierge") {
+        WindowGroup(Brand.name) {
             ContentView()
                 .environment(model)
                 .environment(conversation)

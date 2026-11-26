@@ -36,7 +36,7 @@ struct ConciergeSettings: Codable, Equatable {
     var listenAfter = true
     /// Talking over Concierge stops it and starts your turn.
     var interruptible = true
-    /// Listen for "Concierge" while the app runs.
+    /// Listen for the name while the app runs.
     var wakeWord = true
     /// Show the face in a corner of the screen when Concierge talks and its window is out of sight.
     var floatingFace = true
@@ -162,12 +162,12 @@ struct SettingsView: View {
                 Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
-                Toggle("Listen for \u{201C}Concierge\u{201D} while Concierge is open", isOn: $s.wakeWord)
+                Toggle("Listen for \u{201C}\(Brand.name)\u{201D} while \(Brand.name) is open", isOn: $s.wakeWord)
                 Picker("Face", selection: $s.face) {
                     ForEach(Face.Style.allCases) { Text($0.name).tag($0.rawValue) }
                 }
                 Toggle("Show the face on screen when the window is out of sight", isOn: $s.floatingFace)
-                Text("Say \u{201C}Concierge\u{201D}, or \u{201C}Concierge, what\u{2019}s on tomorrow?\u{201D}. Recognition stays on this Mac. Paused while silenced.")
+                Text("Say \u{201C}\(Brand.name)\u{201D}, or \u{201C}\(Brand.name), what\u{2019}s on tomorrow?\u{201D}. Recognition stays on this Mac. Paused while silenced.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     if s.isSilenced() {

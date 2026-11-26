@@ -201,7 +201,7 @@ struct SilenceButton: View {
         } label: {
             Label("Voice", systemImage: quiet ? "speaker.slash" : "speaker.wave.2")
         }
-        .help(quiet ? "Concierge is silent" : "Concierge speaks its notifications")
+        .help(quiet ? "\(Brand.name) is silent" : "\(Brand.name) speaks its notifications")
         .accessibilityIdentifier("toolbar.silence")
         .onAppear { s = ConciergeSettings.load() }
         // Settings or the clock may have ended a silence.
@@ -287,9 +287,9 @@ struct FaceButton: View {
         .background(PlaceProbe { x in
             if abs((place.restX ?? -1) - x) > 0.5 { place.restX = x }
         })
-        .help(talk.isActive ? "Stop the conversation" : silenced ? "Concierge is silenced. Click to talk anyway (⌘T)" : "Talk to Concierge (⌘T)")
+        .help(talk.isActive ? "Stop the conversation" : silenced ? "\(Brand.name) is silenced. Click to talk anyway (⌘T)" : "Talk to \(Brand.name) (⌘T)")
         .keyboardShortcut("t", modifiers: .command)
-        .accessibilityLabel(talk.isActive ? "Stop talking" : "Talk to Concierge")
+        .accessibilityLabel(talk.isActive ? "Stop talking" : "Talk to \(Brand.name)")
         .accessibilityIdentifier("toolbar.talk")
         .onReceive(NotificationCenter.default.publisher(for: ConciergeSettings.changed)) { _ in
             s = ConciergeSettings.load()

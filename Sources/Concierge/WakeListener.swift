@@ -4,7 +4,7 @@ import Speech
 
 private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "wake")
 
-/// Listens for "Concierge" while the app runs (in front or not) and no conversation is
+/// Listens for the assistant's name ("Nestor", from `Brand`) while the app runs (in front or not) and no conversation is
 /// going on, then starts one. Runs only with on-device recognition, so the
 /// always-open microphone never streams audio off the Mac. Paused while
 /// switched off in Settings or while Concierge is silenced.
@@ -19,6 +19,8 @@ final class WakeListener {
     /// Whether this listener keeps the audio engine running.
     private var holding = false
     private var nextTry = Date.distantPast
+    /// The name it listens for.
+    private let name = Brand.name
     private var recogniser: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -105,6 +107,8 @@ final class WakeListener {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
+        // Tells the recogniser the name is a word to expect.
+        request.contextualStrings = [name]
         self.request = request
         io.setWakeRequest(request)
         requestStarted = Date()
@@ -132,7 +136,7 @@ final class WakeListener {
     }
 
     private func heard(_ text: String) {
-        guard let after = Self.afterWakeWord(text) else { return }
+        guard let after = CalledName.after(text, name: name) else { return }
         if pending?.words != after { pending = (after, Date()) }
     }
 
@@ -162,21 +166,6 @@ final class WakeListener {
     /// tomorrow"), so a short tail gets more time than a full question.
     nonisolated static func settleTime(after words: String) -> TimeInterval {
         words.split(separator: " ").count <= 2 ? 2.0 : 1.5
-    }
-
-    /// The words after "Concierge" (or "Hey Concierge"), or nil when it was not said.
-    nonisolated static func afterWakeWord(_ text: String) -> String? {
-        // The last mention counts: earlier ones were part of other talk.
-        var last: Range<String.Index>?
-        var from = text.startIndex
-        while let r = text.range(of: #"\bconcierge\b"#, options: [.regularExpression, .caseInsensitive],
-                                 range: from..<text.endIndex) {
-            last = r
-            from = r.upperBound
-        }
-        guard let last else { return nil }
-        let rest = text[last.upperBound...]
-        return rest.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
     }
 }
 

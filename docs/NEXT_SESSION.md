@@ -1,13 +1,15 @@
 # NEXT_SESSION
 
 Main tip `73abeaf` (code; this doc lands just after). **Concierge has a
-face.** An owl in a concierge's hat rests in the top bar next to the date,
+face and a name: Nestor.** The owner sees and says "Nestor" everywhere (window,
+menu bar, notifications, wake word); the code, the app file and this
+repository keep the working name Concierge. An owl in a concierge's hat rests in the top bar next to the date,
 blinking and looking about; it sleeps while Concierge is silenced. A click on
-it, Cmd-T or the wake word starts a conversation: the owl glides to the middle
+it, Cmd-T or saying "Nestor" starts a conversation: the owl glides to the middle
 of the window and grows, shows the words it hears, moves its beak with the
 voice, and glides back at the end. When the window is out of sight it appears
 in a corner of the screen. The owner chose it from nine styles, all still in
-Settings. Also new: "Concierge, show your face" and "hide" move the window,
+Settings. Also new: "Nestor, show your face" and "hide" move the window,
 and the wake listener keeps nothing in the system log. Session logs:
 [2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md).
 
@@ -22,9 +24,9 @@ count (`grep -l -- "stopped by a safety classifier"
 
 1. **Check by voice.** These need the owner talking: the beak moving with
    Concierge's voice, the heard words under the owl, the owl in the screen
-   corner when called with the window hidden, and, since the wake word and
-   the conversation share one microphone session, that the wake word still
-   answers and that talking over Concierge still stops it. The owner
+   corner when called with the window hidden, that saying "Nestor" wakes it
+   (the recogniser may spell the name its own way; `CalledName` allows one
+   letter of difference), and that talking over it still stops it. The owner
    confirmed on 2026-11-26 that a click on the owl works with no bip.
 2. **Judge the Sonnet trial around 2026-12-03.** Compare filter stops and page
    quality with the Opus week. Keep Sonnet, or go back by deleting `model:` in

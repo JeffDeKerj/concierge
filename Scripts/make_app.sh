@@ -7,7 +7,10 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
 APP_NAME="Concierge"
-DISPLAY_NAME="Concierge"
+# What the owner sees in the menu bar and the Dock. The app file, the
+# executable and the bundle identifier keep the working name, so the
+# scheduler's path and the privacy grants stay valid.
+DISPLAY_NAME="Nestor"
 BUNDLE_ID="local.jeffdekerj.concierge"
 APP_DIR="$ROOT/$APP_NAME.app"
 
@@ -42,8 +45,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSRequiresAquaSystemAppearance</key><false/>
-    <key>NSMicrophoneUsageDescription</key><string>Concierge listens when you talk to it, and for a few seconds after it says an alert.</string>
-    <key>NSSpeechRecognitionUsageDescription</key><string>Concierge turns what you say into a question, on this Mac.</string>
+    <key>NSMicrophoneUsageDescription</key><string>$DISPLAY_NAME listens when you talk to it, and for a few seconds after it says an alert.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>$DISPLAY_NAME turns what you say into a question, on this Mac.</string>
 </dict>
 </plist>
 PLIST

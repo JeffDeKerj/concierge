@@ -1,0 +1,79 @@
+import Foundation
+
+/// What the owner calls the assistant, in everything they see or say. The
+/// code, the app file, the repository and the skills keep the working name
+/// Concierge; `Scripts/make_app.sh` and `Scripts/tick.py` carry the same
+/// name for the menu bar and the notifications.
+enum Brand {
+    static let name = "Nestor"
+}
+
+/// Finding the name in what was heard. Said aloud, it is the wake word.
+enum CalledName {
+    /// Whether a heard word is the name. The recogniser does not always
+    /// spell a name the same way ("Nestor", "Nester"), so a name of five
+    /// letters or more also matches with one letter different.
+    static func matches(_ word: String, name: String) -> Bool {
+        let heard = letters(word), wanted = letters(name)
+        guard !wanted.isEmpty else { return false }
+        if heard == wanted { return true }
+        return wanted.count >= 5 && distance(heard, wanted) <= 1
+    }
+
+    /// The words after the name, or nil when the name was not said. The
+    /// last mention counts: earlier ones were part of other talk.
+    static func after(_ text: String, name: String) -> String? {
+        let words = words(in: text)
+        var last: String.Index?
+        for (i, word) in words.enumerated() {
+            if matches(word.text, name: name) {
+                last = word.range.upperBound
+            } else if i + 1 < words.count, matches(word.text + words[i + 1].text, name: name) {
+                // Heard in two pieces: "nest or".
+                last = words[i + 1].range.upperBound
+            }
+        }
+        guard let last else { return nil }
+        return text[last...].trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+    }
+
+    /// What was said without the name at its start or end: "thanks, Nestor"
+    /// is "thanks", so the name does not hide a goodbye or a command.
+    static func removed(from text: String, name: String) -> String {
+        var words = words(in: text)
+        guard words.count > 1 else { return text }
+        if let first = words.first, matches(first.text, name: name) { words.removeFirst() }
+        if words.count > 1, let last = words.last, matches(last.text, name: name) { words.removeLast() }
+        guard let first = words.first, let last = words.last else { return text }
+        return text[first.range.lowerBound..<last.range.upperBound]
+            .trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+    }
+
+    private static func words(in text: String) -> [(text: String, range: Range<String.Index>)] {
+        var found: [(String, Range<String.Index>)] = []
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) { word, range, _, _ in
+            if let word { found.append((word, range)) }
+        }
+        return found
+    }
+
+    private static func letters(_ text: String) -> [Character] {
+        Array(text.lowercased().filter(\.isLetter))
+    }
+
+    /// How many letters must be changed, added or dropped to turn one word into the other.
+    private static func distance(_ a: [Character], _ b: [Character]) -> Int {
+        if abs(a.count - b.count) > 1 { return 2 }
+        var row = Array(0...b.count)
+        for (i, x) in a.enumerated() {
+            var previous = row[0]
+            row[0] = i + 1
+            for (j, y) in b.enumerated() {
+                let above = row[j + 1]
+                row[j + 1] = min(previous + (x == y ? 0 : 1), above + 1, row[j] + 1)
+                previous = above
+            }
+        }
+        return row[b.count]
+    }
+}

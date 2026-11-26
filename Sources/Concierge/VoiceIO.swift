@@ -20,7 +20,7 @@ final class VoiceIO {
         case notAllowed(String), unavailable
         var errorDescription: String? {
             switch self {
-            case .notAllowed(let what): "Concierge may not use \(what). Allow it in System Settings › Privacy & Security."
+            case .notAllowed(let what): "\(Brand.name) may not use \(what). Allow it in System Settings › Privacy & Security."
             case .unavailable: "Speech recognition is not available right now."
             }
         }
