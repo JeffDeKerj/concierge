@@ -7,7 +7,9 @@ enum Face {
     /// The character that wears the expressions, from the least like a
     /// person to the most.
     enum Style: String, CaseIterable, Identifiable {
-        case halo, sprout, robot, kitty, android, bellhop
+        case halo, sprout, robot, kitty, android, bellhop, owl, penguin, pup
+        /// The animals, each in a concierge's hat.
+        static let animals: [Style] = [.owl, .penguin, .pup]
         var id: String { rawValue }
         var name: String {
             switch self {
@@ -17,6 +19,9 @@ enum Face {
             case .kitty: "Kitty"
             case .android: "Android"
             case .bellhop: "Bellhop"
+            case .owl: "Owl"
+            case .penguin: "Penguin"
+            case .pup: "Pup"
             }
         }
     }

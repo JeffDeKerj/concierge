@@ -130,7 +130,8 @@ struct FaceSheetTests {
             }
             .frame(width: side, height: side)
         }
-        let sheet = VStack(alignment: .leading, spacing: 18) {
+        func sheet(_ styles: [Face.Style], from first: Int) -> some View {
+          VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 16) {
                 Text("").frame(width: 110)
                 ForEach(expressions, id: \.self) { expression in
@@ -139,9 +140,9 @@ struct FaceSheetTests {
                 Text("in the window").frame(width: 150)
             }
             .font(.title3).foregroundStyle(.secondary)
-            ForEach(Array(Face.Style.allCases.enumerated()), id: \.offset) { row, style in
+            ForEach(Array(styles.enumerated()), id: \.offset) { row, style in
                 HStack(spacing: 16) {
-                    Text("\(row + 1). \(style.name)").font(.title.bold()).foregroundStyle(.white).frame(width: 110, alignment: .leading)
+                    Text("\(first + row). \(style.name)").font(.title.bold()).foregroundStyle(.white).frame(width: 110, alignment: .leading)
                     ForEach(Array(expressions.enumerated()), id: \.offset) { i, expression in
                         face(style, expression, 170, 1.2 + Double(i) * 0.37)
                     }
@@ -153,10 +154,13 @@ struct FaceSheetTests {
                 }
             }
         }
-        .padding(28)
-        .background(Color(red: 0.06, green: 0.07, blue: 0.08))
-        .environment(\.colorScheme, .dark)
-        try save(sheet, to: path)
+          .padding(28)
+          .background(Color(red: 0.06, green: 0.07, blue: 0.08))
+          .environment(\.colorScheme, .dark)
+        }
+        let others = Face.Style.allCases.filter { !Face.Style.animals.contains($0) }
+        try save(sheet(others, from: 1), to: path)
+        try save(sheet(Face.Style.animals, from: others.count + 1), to: path.replacingOccurrences(of: ".png", with: "-animals.png"))
         try save(PlacesSheet(), to: path.replacingOccurrences(of: ".png", with: "-places.png"))
     }
 

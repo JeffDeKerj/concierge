@@ -190,6 +190,10 @@ struct FaceDrawing {
         var eyes = EyeKind.solid
         /// Eyebrows and a small nose: the more human styles.
         var human = false
+        /// Eyebrows alone.
+        var brows = false
+        /// A beak that opens with the voice, in place of a mouth.
+        var beak = false
     }
 
     private enum EyeKind {
@@ -213,6 +217,12 @@ struct FaceDrawing {
                             spark: (50, 26.5, 7), sleep: (78, 16), eyes: .iris, human: true)
         case .bellhop: Plan(eyeY: 57, mouthY: 77, cheekY: 69, darkInk: true, ringX: (9, 91), ringY: 60,
                             spark: (59, 8, 6), sleep: (82, 20), eyes: .person, human: true)
+        case .owl: Plan(eyeY: 53, mouthY: 67, cheekY: 70, darkInk: true, ringX: (8, 92), ringY: 58,
+                        spark: (50, 9, 6), sleep: (84, 18), brows: true, beak: true)
+        case .penguin: Plan(eyeY: 54, mouthY: 67, cheekY: 67, darkInk: true, ringX: (8, 92), ringY: 58,
+                            spark: (57, 8, 6), sleep: (82, 20), brows: true, beak: true)
+        case .pup: Plan(eyeY: 50, mouthY: 75.5, cheekY: 64, darkInk: true, ringX: (4, 96), ringY: 56,
+                        spark: (57, 8, 6), sleep: (84, 20), brows: true)
         }
     }
 
@@ -232,7 +242,18 @@ struct FaceDrawing {
         let night = [Color(red: 0.09, green: 0.12, blue: 0.20), Color(red: 0.05, green: 0.06, blue: 0.11)]
         let pink = Color(red: 1.0, green: 0.50, blue: 0.66)
         let hair = Color(red: 0.27, green: 0.19, blue: 0.17)
-        let ink = style == .bellhop ? hair : plan.darkInk ? Color(red: 0.07, green: 0.09, blue: 0.20) : light
+        let ink = [.bellhop, .owl, .pup].contains(style) ? hair
+            : plan.darkInk ? Color(red: 0.07, green: 0.09, blue: 0.20) : light
+        /// A concierge's small round hat, in the colour of the mood.
+        func cap(_ x: Double, _ y: Double, turn: Double) {
+            var hat = g
+            hat.translateBy(x: x * u, y: y * u)
+            hat.rotate(by: .degrees(turn))
+            hat.fill(Path(roundedRect: CGRect(x: -14 * u, y: -8 * u, width: 28 * u, height: 14 * u), cornerRadius: 3.5 * u),
+                     with: .color(tint(-0.12)))
+            hat.fill(Path(CGRect(x: -14 * u, y: 1.5 * u, width: 28 * u, height: 2.6 * u)), with: .color(tint(0.55)))
+            hat.fill(Path(ellipseIn: CGRect(x: -2.2 * u, y: -11 * u, width: 4.4 * u, height: 4.4 * u)), with: .color(tint(0.55)))
+        }
         func point(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * u, y: y * u) }
         func rect(_ x: Double, _ y: Double, _ w: Double, _ h: Double) -> CGRect {
             CGRect(x: x * u, y: y * u, width: w * u, height: h * u)
@@ -374,13 +395,67 @@ struct FaceDrawing {
             fringe.addQuadCurve(to: point(60, 36), control: point(80, 38))
             fringe.addQuadCurve(to: point(17.5, 54), control: point(30, 38))
             g.fill(fringe, with: .color(hair))
-            var hat = g
-            hat.translateBy(x: 59 * u, y: 17 * u)
-            hat.rotate(by: .degrees(11))
-            hat.fill(Path(roundedRect: CGRect(x: -14 * u, y: -8 * u, width: 28 * u, height: 14 * u), cornerRadius: 3.5 * u),
-                     with: .color(tint(-0.12)))
-            hat.fill(Path(CGRect(x: -14 * u, y: 1.5 * u, width: 28 * u, height: 2.6 * u)), with: .color(tint(0.55)))
-            hat.fill(Path(ellipseIn: CGRect(x: -2.2 * u, y: -11 * u, width: 4.4 * u, height: 4.4 * u)), with: .color(tint(0.55)))
+            cap(59, 17, turn: 11)
+
+        case .owl:
+            // A round brown owl: two ear tufts, a pale disc around each eye.
+            let feathers = [Color(red: 0.66, green: 0.50, blue: 0.38), Color(red: 0.48, green: 0.35, blue: 0.27)]
+            for flip in [1.0, -1.0] {
+                func mirrored(_ x: Double, _ y: Double) -> CGPoint { point(50 - flip * (50 - x), y) }
+                var tuft = Path()
+                tuft.move(to: mirrored(15, 46))
+                tuft.addLine(to: mirrored(16, 17))
+                tuft.addLine(to: mirrored(40, 28))
+                tuft.closeSubpath()
+                g.fill(tuft, with: .color(feathers[0]))
+                g.stroke(tuft, with: .color(feathers[0]), style: StrokeStyle(lineWidth: 5 * u, lineJoin: .round))
+            }
+            g.fill(Path(roundedRect: rect(12, 24, 76, 69), cornerRadius: 33 * u, style: .continuous),
+                   with: upDown(feathers, 24, 93))
+            for x in [35.0, 65.0] {
+                g.fill(Path(ellipseIn: centred(x, 53, 31, 33)), with: .color(Color(red: 0.98, green: 0.93, blue: 0.83)))
+            }
+            cap(50, 16, turn: -7)
+
+        case .penguin:
+            // A penguin: dark head, white face, a bow tie under the chin.
+            g.fill(Path(roundedRect: rect(12, 21, 76, 70), cornerRadius: 34 * u, style: .continuous),
+                   with: upDown([Color(red: 0.22, green: 0.27, blue: 0.41), Color(red: 0.11, green: 0.13, blue: 0.23)], 21, 91))
+            let white = Color(red: 0.97, green: 0.98, blue: 1.0)
+            for x in [36.5, 63.5] {
+                g.fill(Path(ellipseIn: centred(x, 53, 33, 35)), with: .color(white))
+            }
+            g.fill(Path(ellipseIn: centred(50, 68, 54, 38)), with: .color(white))
+            for flip in [1.0, -1.0] {
+                var wing = Path()
+                wing.move(to: point(50, 93))
+                wing.addLine(to: point(50 + flip * 10, 88.5))
+                wing.addLine(to: point(50 + flip * 10, 97.5))
+                wing.closeSubpath()
+                g.fill(wing, with: .color(light))
+                g.stroke(wing, with: .color(light), style: StrokeStyle(lineWidth: 1.6 * u, lineJoin: .round))
+            }
+            g.fill(Path(ellipseIn: centred(50, 93, 5, 5)), with: .color(tint(-0.2)))
+            cap(57, 15, turn: 10)
+
+        case .pup:
+            // A golden puppy: floppy ears, a pale muzzle, a dark nose.
+            let ear = Color(red: 0.74, green: 0.52, blue: 0.31)
+            for (x, turn) in [(15.0, 10.0), (85.0, -10.0)] {
+                var flap = g
+                flap.translateBy(x: x * u, y: 52 * u)
+                flap.rotate(by: .degrees(turn + sin(time * 1.3) * 1.5))
+                flap.fill(Path(roundedRect: CGRect(x: -10 * u, y: -24 * u, width: 20 * u, height: 48 * u), cornerRadius: 10 * u),
+                          with: .color(ear))
+            }
+            g.fill(Path(roundedRect: rect(17, 21, 66, 71), cornerRadius: 30 * u, style: .continuous),
+                   with: upDown([Color(red: 0.97, green: 0.82, blue: 0.58), Color(red: 0.91, green: 0.71, blue: 0.46)], 21, 92))
+            g.fill(Path(ellipseIn: centred(50, 72, 40, 30)), with: .color(Color(red: 1.0, green: 0.95, blue: 0.87)))
+            g.fill(Path(roundedRect: centred(50, 64.5, 12, 8), cornerRadius: 3.6 * u), with: .color(hair))
+            g.fill(Path(ellipseIn: centred(48, 63, 3.4, 1.8)), with: .color(Color.white.opacity(0.5)))
+            g.stroke(Path { p in p.move(to: point(50, 68.5)); p.addLine(to: point(50, 73)) },
+                     with: .color(hair), style: StrokeStyle(lineWidth: 1.6 * u, lineCap: .round))
+            cap(57, 16, turn: 10)
         }
 
         let roam = Face.gaze(at: time)
@@ -402,7 +477,7 @@ struct FaceDrawing {
         let mouthX = 50 + dx * 0.5, mouthY = plan.mouthY + dy * 0.5
         let eyeWidth = pose.eyeWidth, eyeHeight = pose.eyeHeight, closed = pose.closed
         let smile = pose.smile, wave = pose.wave, glow = pose.glow, darkInk = plan.darkInk
-        let eyeKind = plan.eyes
+        let eyeKind = plan.eyes, beak = plan.beak
         g.drawLayer { layer in
             if !darkInk {
                 layer.addFilter(.shadow(color: light.opacity(0.85 * glow), radius: 2.6 * u))
@@ -439,7 +514,7 @@ struct FaceDrawing {
                 }
             }
             // The closed mouth: a small curve, up for a smile.
-            let closedMouth = (1 - mouth.weight) * (1 - wave)
+            let closedMouth = beak ? 0 : (1 - mouth.weight) * (1 - wave)
             if closedMouth > 0.01 {
                 var curve = Path()
                 let lift = smile * 1.2
@@ -449,7 +524,7 @@ struct FaceDrawing {
                 layer.stroke(curve, with: .color(ink.opacity(closedMouth)),
                              style: StrokeStyle(lineWidth: 2.2 * u, lineCap: .round))
             }
-            if mouth.weight > 0.01 {
+            if mouth.weight > 0.01, !beak {
                 layer.fill(pill(centred(mouthX, mouthY + 0.5, mouth.width, mouth.height)),
                            with: .color(ink.opacity(mouth.weight)))
             }
@@ -457,13 +532,33 @@ struct FaceDrawing {
             if wave > 0.01 {
                 for i in -1...1 {
                     let swell = sin(time * 7 - Double(i) * 1.1)
-                    layer.fill(Path(ellipseIn: centred(mouthX + Double(i) * 5.2, mouthY + swell * 1.5, 2.8, 2.8)),
+                    layer.fill(Path(ellipseIn: centred(mouthX + Double(i) * 5.2, mouthY + (beak ? 10 : 0) + swell * 1.5, 2.8, 2.8)),
                                with: .color(ink.opacity(wave * (0.7 + 0.3 * swell))))
                 }
             }
         }
 
-        if plan.human {
+        if plan.beak {
+            // The beak: the lower half drops with the voice.
+            let drop = mouth.weight * (mouth.height - 2.2) * 0.75
+            var lower = Path()
+            lower.move(to: point(mouthX - 3.6, mouthY))
+            lower.addLine(to: point(mouthX + 3.6, mouthY))
+            lower.addLine(to: point(mouthX, mouthY + 3 + drop))
+            lower.closeSubpath()
+            let dark = Color(red: 0.86, green: 0.44, blue: 0.12)
+            g.fill(lower, with: .color(dark))
+            g.stroke(lower, with: .color(dark), style: StrokeStyle(lineWidth: 1.6 * u, lineJoin: .round))
+            var upper = Path()
+            upper.move(to: point(mouthX - 5.2, mouthY - 1.5))
+            upper.addQuadCurve(to: point(mouthX + 5.2, mouthY - 1.5), control: point(mouthX, mouthY - 6))
+            upper.addLine(to: point(mouthX, mouthY + 3.6))
+            upper.closeSubpath()
+            let orange = Color(red: 0.99, green: 0.68, blue: 0.22)
+            g.fill(upper, with: .color(orange))
+            g.stroke(upper, with: .color(orange), style: StrokeStyle(lineWidth: 1.6 * u, lineJoin: .round))
+        }
+        if plan.human || plan.brows {
             // Eyebrows: up with wide eyes, slanted with worry, one up while it thinks.
             let worry = max(0, -pose.smile)
             for (i, cx) in eyes.enumerated() {
@@ -476,6 +571,8 @@ struct FaceDrawing {
                 g.stroke(brow, with: .color(ink.opacity(style == .android ? 0.55 : 0.95)),
                          style: StrokeStyle(lineWidth: 1.9 * u, lineCap: .round))
             }
+        }
+        if plan.human {
             // A small nose.
             var nose = Path()
             nose.move(to: point(mouthX - 1.6, plan.cheekY - 1.2))
