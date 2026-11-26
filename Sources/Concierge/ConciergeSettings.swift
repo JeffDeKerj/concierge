@@ -38,6 +38,24 @@ struct ConciergeSettings: Codable, Equatable {
     var interruptible = true
     /// Listen for the name while the app runs.
     var wakeWord = true
+    /// The language of spoken conversations: a `Language`.
+    var language = Language.english.rawValue
+    /// The French voice; empty means the best French voice.
+    var voiceFr = ""
+    /// When French recognition is not on this Mac, let Apple's servers do
+    /// it during a conversation. Off: speech never leaves the Mac.
+    var frenchOnline = false
+
+    /// The language conversations run in. French only when it can be
+    /// used: on this Mac, or through Apple's servers when that is allowed.
+    func spokenLanguage(frenchOnThisMac: Bool) -> Language {
+        let chosen = Language(rawValue: language) ?? .english
+        return chosen == .french && !(frenchOnThisMac || frenchOnline) ? .english : chosen
+    }
+
+    func voiceID(for language: Language) -> String {
+        language == .french ? voiceFr : voice
+    }
     /// Show the face in a corner of the screen when Concierge talks and its window is out of sight.
     var floatingFace = true
     /// Which character Concierge's face is: a `Face.Style`.
@@ -105,6 +123,8 @@ struct SettingsView: View {
     @State private var s = ConciergeSettings.load()
     private let models = ["haiku", "sonnet", "opus"]
     private let voices = Speaker.voices()
+    private let frenchVoices = Speaker.voices(for: .french)
+    @State private var frenchHere = Language.french.isOnThisMac
 
     var body: some View {
         Form {
@@ -148,7 +168,7 @@ struct SettingsView: View {
                     ForEach(voices, id: \.identifier) { Text(Speaker.label($0)).tag($0.identifier) }
                 }
                 Button("Test the voice") {
-                    Speaker.preview("Good morning. Stephane asks about the mutation assays in the MIT group.", voiceID: s.voice)
+                    Speaker.preview(Language.english.sample, voiceID: s.voice)
                 }
                 Text("Nicer voices: System Settings › Accessibility › Spoken Content › System voice › Manage Voices. Download a Premium English voice, then pick it here.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -159,6 +179,27 @@ struct SettingsView: View {
                     Text("and")
                     TextField("To", text: $s.speakTo).labelsHidden().frame(width: 56)
                 }
+                Picker("Language of conversations", selection: $s.language) {
+                    ForEach(Language.allCases) { Text($0.name).tag($0.rawValue) }
+                }
+                if s.language == Language.french.rawValue {
+                    Picker("French voice", selection: $s.voiceFr) {
+                        Text("Best French voice").tag("")
+                        ForEach(frenchVoices, id: \.identifier) { Text(Speaker.label($0)).tag($0.identifier) }
+                    }
+                    Button("Test the French voice") {
+                        Speaker.preview(Language.french.sample, voiceID: s.voiceFr, language: .french)
+                    }
+                    if !frenchHere {
+                        Text("French recognition is not on this Mac yet, so \(Brand.name) keeps to English. Add French in System Settings › Keyboard › Dictation › Languages, or switch on the choice below.")
+                            .font(.caption).foregroundStyle(.orange)
+                        Toggle("Use Apple\u{2019}s servers for French", isOn: $s.frenchOnline)
+                        Text("Only while a conversation runs. Listening for \u{201C}\(Brand.name)\u{201D} always stays on this Mac.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text("Or say \u{201C}\(Brand.name), speak French\u{201D}, and \u{201C}\(Brand.name), parle anglais\u{201D} to come back. The window and the morning page stay in English.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
@@ -186,7 +227,10 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 440)
         // The window's speaker button may have changed the file meanwhile.
-        .onAppear { s = ConciergeSettings.load() }
+        .onAppear {
+            s = ConciergeSettings.load()
+            frenchHere = Language.french.isOnThisMac
+        }
         .onChange(of: s) { _, new in new.save() }
     }
 }

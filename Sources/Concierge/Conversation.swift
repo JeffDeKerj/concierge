@@ -48,9 +48,8 @@ final class Conversation {
         error = nil
         // Active at once, so the wake listener lets go of the microphone.
         state = .thinking
-        let opening = greet ? "Yes?" : opening
         loop = Task {
-            await run(opening: opening, context: context, quickReply: quickReply, firstQuestion: firstQuestion)
+            await run(opening: opening, greet: greet, context: context, quickReply: quickReply, firstQuestion: firstQuestion)
         }
     }
 
@@ -76,25 +75,30 @@ final class Conversation {
         state = .idle
     }
 
-    private func run(opening: String?, context: String?, quickReply: Bool, firstQuestion: String?) async {
+    private func run(opening: String?, greet: Bool, context: String?, quickReply: Bool, firstQuestion: String?) async {
         defer {
             io.endConversation()
             state = .idle
         }
+        var settings = ConciergeSettings.load()
+        var language = settings.spokenLanguage(frenchOnThisMac: Language.french.isOnThisMac)
         do {
             try await VoiceIO.authorise()
             try io.hold(.talk)
+            try io.use(language, allowOnline: settings.frenchOnline)
         } catch {
             self.error = error.localizedDescription
             return
         }
-        let settings = ConciergeSettings.load()
         io.onWords = { [weak self] words in
             guard let self, case .listening = self.state else { return }
             self.state = .listening(words)
         }
         if let opening {
-            await speak(opening, settings)
+            // An alert: the daytime jobs write those in English.
+            await speak(opening, settings, in: .english)
+        } else if greet {
+            await speak(language.yes, settings, in: language)
         }
         var context = context
         for turn in 0..<maxTurns {
@@ -107,39 +111,56 @@ final class Conversation {
             guard !Task.isCancelled, let heard else { return }
             // "Thanks, Nestor" is a goodbye, and "Nestor, hide" a command.
             let said = CalledName.removed(from: heard, name: Brand.name)
+            if let wanted = Language.asked(in: said) {
+                do {
+                    try io.use(wanted, allowOnline: settings.frenchOnline)
+                    language = wanted
+                    ConciergeSettings.update { $0.language = wanted.rawValue }
+                    settings = ConciergeSettings.load()
+                    await speak(wanted.switched, settings, in: wanted)
+                } catch {
+                    await speak(Language.frenchMissing, settings, in: .english)
+                }
+                continue
+            }
             switch Self.windowCommand(said) {
             case .show:
                 Self.showWindow()
-                await speak("Here I am.", settings)
+                await speak(language.hereIAm, settings, in: language)
                 continue
             case .hide:
                 NSApp.hide(nil)
-                state = .speaking
-                _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
+                await sayAndEnd(language.okay, settings, in: language)
                 return
             case nil:
                 break
             }
             if Self.isGoodbye(said) {
-                state = .speaking
-                _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
+                await sayAndEnd(language.okay, settings, in: language)
                 return
             }
             state = .thinking
-            let reply = await model.ask(heard, prompt: Self.spokenPrompt(heard, context: context))
+            let reply = await model.ask(heard, prompt: Self.spokenPrompt(heard, context: context, language: language))
             context = nil
             guard !Task.isCancelled else { return }
-            await speak(reply ?? "Sorry, I could not get an answer.", settings)
+            await speak(reply ?? language.noAnswer, settings, in: language)
             if reply == nil { return }
         }
     }
 
     /// Says something the owner may talk over, when Settings allows that.
-    private func speak(_ text: String, _ settings: ConciergeSettings) async {
+    private func speak(_ text: String, _ settings: ConciergeSettings, in language: Language) async {
         state = .speaking
-        if await io.say(text, voiceID: settings.voice, interruptible: settings.interruptible) == .interrupted {
+        if await io.say(text, voiceID: settings.voiceID(for: language), interruptible: settings.interruptible,
+                        in: language) == .interrupted {
             state = .listening(io.heard)
         }
+    }
+
+    /// The last word of a conversation: said without listening.
+    private func sayAndEnd(_ text: String, _ settings: ConciergeSettings, in language: Language) async {
+        state = .speaking
+        _ = await io.say(text, voiceID: settings.voiceID(for: language), interruptible: false, in: language)
     }
 
     enum WindowCommand: Equatable { case show, hide }
@@ -147,13 +168,15 @@ final class Conversation {
     /// "Show your face", "come up", "hide" and the like: handled here, at
     /// once, without asking the model.
     nonisolated static func windowCommand(_ heard: String) -> WindowCommand? {
-        let words = heard.lowercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+        let words = Phrases.plain(heard)
         // A command is short; a longer sentence is a question that happens to use the words.
         guard words.split(separator: " ").count <= 6 else { return nil }
         let show = ["show your face", "show yourself", "show the window", "show me the window", "show up",
                     "come up", "come forward", "come to the front", "bring up the window", "open the window",
-                    "open up", "where are you"]
-        let hide = ["hide", "hide yourself", "hide the window", "go to the back", "go away", "go back"]
+                    "open up", "where are you",
+                    "montre toi", "montre ton visage", "montre la fenetre", "ou es tu", "viens ici"]
+        let hide = ["hide", "hide yourself", "hide the window", "go to the back", "go away", "go back",
+                    "cache toi", "cache la fenetre", "va t'en", "disparais"]
         if show.contains(where: { words.contains($0) }) { return .show }
         if hide.contains(where: { words == $0 || words.hasPrefix($0 + " ") || words.hasSuffix(" " + $0) }) { return .hide }
         return nil
@@ -170,22 +193,25 @@ final class Conversation {
     }
 
     /// What the model reads for a spoken question.
-    nonisolated static func spokenPrompt(_ heard: String, context: String?) -> String {
+    nonisolated static func spokenPrompt(_ heard: String, context: String?, language: Language = .english) -> String {
         var p = "(The owner said this aloud and will hear your answer read out. Answer in one to three short spoken sentences: no lists, no markdown, no links. You still never send, reply, accept, pay or delete; offer to draft instead.)"
+        p += language.answerRule
         if let context { p += " About this alert: \(context)." }
         return p + " \(heard)"
     }
 
     /// "Thanks", "that's all", "stop" and the like end the conversation.
     nonisolated static func isGoodbye(_ heard: String) -> Bool {
-        let words = heard.lowercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+        let words = Phrases.plain(heard)
         let endings = ["stop", "no", "no thanks", "no thank you", "nothing", "that's all", "that's it",
-                       "thanks", "thank you", "goodbye", "bye", "never mind", "not now", "later"]
+                       "thanks", "thank you", "goodbye", "bye", "never mind", "not now", "later",
+                       "non", "non merci", "merci", "merci beaucoup", "rien", "c'est tout", "c'est bon",
+                       "au revoir", "laisse tomber", "pas maintenant", "plus tard", "ca ira"]
         if endings.contains(words) { return true }
         // "No thanks, that's fine" ends it; "Thanks, and what about Declan?" does not.
         let short = words.split(separator: " ").count <= 4 && !words.contains("?")
         // A bare "no" leads into a correction ("No, the other one"), so only longer endings count here.
-        return short && endings.filter { $0 != "no" }.contains { words.hasPrefix($0 + ",") || words.hasPrefix($0 + ".") }
+        return short && endings.filter { $0 != "no" && $0 != "non" }.contains { words.hasPrefix($0 + ",") || words.hasPrefix($0 + ".") }
     }
 }
 

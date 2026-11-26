@@ -10,11 +10,11 @@ enum Speaker {
     /// Posted by `--say` to a running Concierge, which then speaks and listens.
     static let alertNotification = Notification.Name("local.jeffdekerj.concierge.alert")
 
-    /// English voices, best quality first. Premium and Enhanced voices appear
+    /// The voices of a language, best quality first. Premium and Enhanced voices appear
     /// here once downloaded in System Settings › Accessibility › Spoken Content.
-    static func voices() -> [AVSpeechSynthesisVoice] {
+    static func voices(for language: Language = .english) -> [AVSpeechSynthesisVoice] {
         AVSpeechSynthesisVoice.speechVoices()
-            .filter { $0.language.hasPrefix("en") && !$0.voiceTraits.contains(.isNoveltyVoice) }
+            .filter { $0.language.hasPrefix(language.rawValue) && !$0.voiceTraits.contains(.isNoveltyVoice) }
             .sorted { ($0.quality.rawValue, $1.name) > ($1.quality.rawValue, $0.name) }
     }
 
@@ -28,14 +28,14 @@ enum Speaker {
         return "\(voice.name) (\(region))\(quality)"
     }
 
-    /// The saved voice, else the best English voice installed.
-    static func voice(id: String) -> AVSpeechSynthesisVoice? {
-        AVSpeechSynthesisVoice(identifier: id) ?? voices().first
+    /// The saved voice, else the best voice installed for the language.
+    static func voice(id: String, language: Language = .english) -> AVSpeechSynthesisVoice? {
+        AVSpeechSynthesisVoice(identifier: id) ?? voices(for: language).first
     }
 
-    static func utterance(_ text: String, voiceID: String) -> AVSpeechUtterance {
+    static func utterance(_ text: String, voiceID: String, language: Language = .english) -> AVSpeechUtterance {
         let u = AVSpeechUtterance(string: text)
-        u.voice = voice(id: voiceID)
+        u.voice = voice(id: voiceID, language: language)
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
         return u
     }
@@ -43,9 +43,9 @@ enum Speaker {
     /// For the Test button in Settings.
     @MainActor static let shared = AVSpeechSynthesizer()
 
-    @MainActor static func preview(_ text: String, voiceID: String) {
+    @MainActor static func preview(_ text: String, voiceID: String, language: Language = .english) {
         shared.stopSpeaking(at: .immediate)
-        shared.speak(utterance(text, voiceID: voiceID))
+        shared.speak(utterance(text, voiceID: voiceID, language: language))
     }
 
     /// `Concierge --say <voice id> <text>`: speaks and returns when done.

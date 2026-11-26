@@ -21,6 +21,12 @@ final class WakeListener {
     private var nextTry = Date.distantPast
     /// The name it listens for.
     private let name = Brand.name
+    /// The language it listens in, and whether the words after the name are
+    /// in the language of the conversation and can be its first question.
+    private var language = Language.english
+    private var keepsQuestion = true
+    private var frenchHere = false
+    private var nextLanguageCheck = Date.distantPast
     private var recogniser: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -44,6 +50,7 @@ final class WakeListener {
                 let s = ConciergeSettings.load()
                 let on = s.wakeWord && !s.isSilenced()
                 keepEngine(on)
+                follow(s)
                 let wanted = on && holding && !conversation.isActive
                 if wanted && !listening { begin() }
                 if !wanted && listening { end() }
@@ -59,6 +66,24 @@ final class WakeListener {
         }
         let mic = await AVCaptureDevice.requestAccess(for: .audio)
         return speech == .authorized && mic
+    }
+
+    /// Listens in the language of conversations when this Mac can recognise
+    /// it by itself. Otherwise it listens for the name in English, which
+    /// always stays on the Mac, and leaves the question to the conversation.
+    private func follow(_ s: ConciergeSettings) {
+        if Date() >= nextLanguageCheck {
+            // Asked now and then: the owner may download French while the app runs.
+            frenchHere = Language.french.isOnThisMac
+            nextLanguageCheck = Date().addingTimeInterval(20)
+        }
+        let spoken = s.spokenLanguage(frenchOnThisMac: frenchHere)
+        let wanted: Language = spoken == .french && frenchHere ? .french : .english
+        keepsQuestion = wanted == spoken
+        if wanted != language {
+            language = wanted
+            if listening { end() }
+        }
     }
 
     /// Holds the audio engine while the wake word is on, and lets go when it is off.
@@ -79,8 +104,7 @@ final class WakeListener {
     }
 
     private func begin() {
-        guard let r = SFSpeechRecognizer(locale: Locale(identifier: "en-GB")) ?? SFSpeechRecognizer(),
-              r.isAvailable else { return }
+        guard let r = SFSpeechRecognizer(locale: language.locale), r.isAvailable else { return }
         // Never listen all the time through Apple's servers.
         guard r.supportsOnDeviceRecognition else {
             log.error("wake: no on-device recognition, so the wake word stays off")
@@ -145,7 +169,7 @@ final class WakeListener {
     /// slow down and grow.
     private func tick() {
         if let pending, Date().timeIntervalSince(pending.changed) > Self.settleTime(after: pending.words) {
-            let question = pending.words
+            let question = keepsQuestion ? pending.words : ""
             log.info("wake: heard the wake word")
             end()
             conversation.start(firstQuestion: question.isEmpty ? nil : question, greet: question.isEmpty)

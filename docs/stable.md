@@ -96,6 +96,14 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   The app file, executable, bundle identifier, repository and skills stay
   "Concierge", so the scheduler's path and the privacy grants hold.
   `CalledName` finds the name in what was heard.
+- **Languages.** `Language.swift`: English or French for spoken
+  conversations only (Settings keys `language`, `voiceFr`, `frenchOnline`).
+  `VoiceIO.use(_:allowOnline:)` sets the recogniser and refuses a language
+  this Mac cannot recognise by itself unless Apple's servers are allowed;
+  the wake listener never uses them and listens in English when French is
+  not on the Mac. "Speak French" / "parle anglais" switch by voice
+  (`Language.asked`). Alerts are written and said in English.
+  `Phrases.plain` strips accents and punctuation before phrases are matched.
 - **Window commands by voice**: `Conversation.windowCommand` ("show your
   face", "hide"), handled before the model is asked.
 - **Scheduled jobs run through the app**: launchd starts

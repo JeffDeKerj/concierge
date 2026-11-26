@@ -17,11 +17,12 @@ private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "voi
 @MainActor
 final class VoiceIO {
     enum Failure: LocalizedError {
-        case notAllowed(String), unavailable
+        case notAllowed(String), unavailable, notOnThisMac(Language)
         var errorDescription: String? {
             switch self {
             case .notAllowed(let what): "\(Brand.name) may not use \(what). Allow it in System Settings › Privacy & Security."
             case .unavailable: "Speech recognition is not available right now."
+            case .notOnThisMac(let language): "\(language.name) speech recognition is not on this Mac."
             }
         }
     }
@@ -40,6 +41,10 @@ final class VoiceIO {
     private let synth = AVSpeechSynthesizer()
     private let feed = Feed()
     private var recogniser: SFSpeechRecognizer?
+    /// The language of the turns and of what is said.
+    private(set) var language = Language.english
+    /// Whether the recogniser in use works on this Mac alone.
+    private var onDevice = true
     private var task: SFSpeechRecognitionTask?
     private var lastChange = Date()
     private var turnStarted = Date()
@@ -102,11 +107,21 @@ final class VoiceIO {
 
     var inputFormat: String { engine.inputNode.outputFormat(forBus: 0).description }
 
+    /// Listens and speaks in `language` from now on. Recognition stays on
+    /// this Mac. When the Mac cannot recognise the language by itself,
+    /// `allowOnline` lets Apple's servers do it; without that this throws
+    /// and nothing changes.
+    func use(_ language: Language, allowOnline: Bool) throws {
+        guard let r = SFSpeechRecognizer(locale: language.locale), r.isAvailable else { throw Failure.unavailable }
+        guard r.supportsOnDeviceRecognition || allowOnline else { throw Failure.notOnThisMac(language) }
+        endTurn()
+        recogniser = r
+        onDevice = r.supportsOnDeviceRecognition
+        self.language = language
+    }
+
     private func startEngine() throws {
         guard !running else { return }
-        guard let r = SFSpeechRecognizer(locale: Locale(identifier: "en-GB")) ?? SFSpeechRecognizer(),
-              r.isAvailable else { throw Failure.unavailable }
-        recogniser = r
         // The output side must exist before voice processing is switched on,
         // or the engine fails to start (avfaudio error -10875).
         _ = engine.outputNode
@@ -194,8 +209,8 @@ final class VoiceIO {
     /// Says `text`. When `interruptible`, it listens at the same time and
     /// stops as soon as the owner talks over it; their words so far stay
     /// in the open turn, which `listen` then finishes.
-    func say(_ text: String, voiceID: String, interruptible: Bool) async -> Said {
-        let buffers = await synthesise(Speaker.utterance(text, voiceID: voiceID))
+    func say(_ text: String, voiceID: String, interruptible: Bool, in spoken: Language? = nil) async -> Said {
+        let buffers = await synthesise(Speaker.utterance(text, voiceID: voiceID, language: spoken ?? language))
         guard let format = buffers.first?.format, !Task.isCancelled else { return .finished }
         engine.disconnectNodeOutput(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
@@ -296,7 +311,8 @@ final class VoiceIO {
         guard !words.isEmpty else { return false }
         let said = Set(Self.words(speaking))
         if words.count == 1 {
-            return ["stop", "wait", "sorry", "hang", "hold", "actually", "excuse"].contains(words[0])
+            return ["stop", "wait", "sorry", "hang", "hold", "actually", "excuse",
+                    "attends", "arrete", "arrête", "pardon"].contains(words[0])
                 && !said.contains(words[0])
         }
         let foreign = words.filter { !said.contains($0) }.count
@@ -349,7 +365,7 @@ final class VoiceIO {
         endTurn()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        if recogniser?.supportsOnDeviceRecognition == true { request.requiresOnDeviceRecognition = true }
+        request.requiresOnDeviceRecognition = onDevice
         request.addsPunctuation = true
         heard = ""
         turnStarted = Date()
