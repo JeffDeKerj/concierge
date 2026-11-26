@@ -117,6 +117,8 @@ final class AppModel {
         loadUpdates()
         if page != before || page?.modificationDate != beforeStamp {
             reloadToken += 1
+            // A new page (the morning run, say) makes an old refresh warning stale.
+            if !isRefreshing { refreshError = nil }
         }
     }
 
@@ -136,6 +138,7 @@ final class AppModel {
         let backend = self.backend
 
         Task {
+            var refused: [String] = []
             // Watch the file while the generator runs; it is written before
             // the generator's own check step ends.
             let watcher = Task {
@@ -158,15 +161,15 @@ final class AppModel {
                 record(kind: "refresh", report)
                 if report.isError {
                     refreshError = "\(backend.displayName) failed: \(report.errorText)"
-                } else if !report.deniedTools.isEmpty {
-                    refreshError = "Some tools were refused: \(report.deniedTools.joined(separator: ", ")). "
-                        + "Allow them in .claude/settings.json."
                 }
+                refused = report.deniedTools
             } catch {
                 refreshError = error.localizedDescription
             }
 
             // One last look, in case the file landed in the final two seconds.
+            // Refused tools are worth a warning only when the page did not get written:
+            // a run that tried a shell command, was refused and read the file instead is fine.
             if modificationDate(of: target) != stampBefore {
                 loadPage()
                 reloadToken += 1
@@ -174,6 +177,7 @@ final class AppModel {
                 let said = lastRefresh?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 refreshError = "The generator finished but did not write today's page."
                     + (said.isEmpty ? "" : " It said: \(said)")
+                    + (refused.isEmpty ? "" : " Refused tools: \(Set(refused).sorted().joined(separator: ", ")).")
             }
             isRefreshing = false
             refreshStartedAt = nil

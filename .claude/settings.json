@@ -20,7 +20,11 @@
       "Bash(/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new:*)",
       "Bash(ls:*)",
       "Bash(date:*)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(ls -t:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/jeffdekerj/obsidian/Biochem Data Extraction/digests"
     ]
   }
 }
