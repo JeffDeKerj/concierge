@@ -128,8 +128,10 @@ final class VoiceIO {
         return await withCheckedContinuation { c in
             synth.write(utterance) { buffer in
                 guard let pcm = buffer as? AVAudioPCMBuffer else { return }
+                // The end can be signalled more than once (when speech is
+                // stopped, say); resuming twice would crash.
                 if pcm.frameLength == 0 {
-                    c.resume(returning: box.take())
+                    if let all = box.finish() { c.resume(returning: all) }
                 } else {
                     box.add(pcm)
                 }
@@ -261,8 +263,15 @@ private final class Feed: @unchecked Sendable {
 private final class Buffers: @unchecked Sendable {
     private let lock = NSLock()
     private var list: [AVAudioPCMBuffer] = []
-    func add(_ b: AVAudioPCMBuffer) { lock.lock(); list.append(b); lock.unlock() }
-    func take() -> [AVAudioPCMBuffer] { lock.lock(); defer { lock.unlock() }; return list }
+    private var finished = false
+    func add(_ b: AVAudioPCMBuffer) { lock.lock(); if !finished { list.append(b) }; lock.unlock() }
+    /// The buffers the first time, nil after that.
+    func finish() -> [AVAudioPCMBuffer]? {
+        lock.lock(); defer { lock.unlock() }
+        guard !finished else { return nil }
+        finished = true
+        return list
+    }
 }
 
 private final class Flag: @unchecked Sendable {
