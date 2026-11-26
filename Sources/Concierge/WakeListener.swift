@@ -61,6 +61,8 @@ final class WakeListener {
         input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
             self?.currentRequest.withLock { $0?.append(buffer) }
             self?.bufferCount.withLock { $0 += 1 }
+            let peak = Self.peak(of: buffer)
+            self?.loudest.withLock { $0 = max($0, peak) }
         }
         engine.prepare()
         do {
@@ -88,6 +90,9 @@ final class WakeListener {
     private nonisolated let currentRequest = Locked<SFSpeechAudioBufferRecognitionRequest?>(nil)
     /// Microphone buffers since the last request, for the log.
     private nonisolated let bufferCount = Locked(0)
+    /// The loudest sample since the last level line, 0 to 1.
+    private nonisolated let loudest = Locked<Float>(0)
+    private var lastLevelLine = Date()
 
     private func newRequest() {
         let buffers = bufferCount.withLock { n -> Int in defer { n = 0 }; return n }
@@ -139,6 +144,13 @@ final class WakeListener {
             return
         }
         if pending == nil, Date().timeIntervalSince(requestStarted) > 50 { newRequest() }
+        // The microphone level every 5 seconds, for diagnosis with `log stream --level debug`.
+        if Date().timeIntervalSince(lastLevelLine) > 5 {
+            lastLevelLine = Date()
+            let peak = loudest.withLock { v -> Float in defer { v = 0 }; return v }
+            let db = peak > 0 ? 20 * log10(peak) : -120
+            log.debug("wake: loudest \(Int(db), privacy: .public) dBFS in the last 5 s")
+        }
     }
 
     /// How long to wait for the words after the wake word to settle. The
@@ -146,6 +158,13 @@ final class WakeListener {
     /// tomorrow"), so a short tail gets more time than a full question.
     nonisolated static func settleTime(after words: String) -> TimeInterval {
         words.split(separator: " ").count <= 2 ? 2.0 : 1.5
+    }
+
+    nonisolated static func peak(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let data = buffer.floatChannelData?[0] else { return 0 }
+        var m: Float = 0
+        for i in 0..<Int(buffer.frameLength) { m = max(m, abs(data[i])) }
+        return m
     }
 
     /// The words after "Concierge" (or "Hey Concierge"), or nil when it was not said.
