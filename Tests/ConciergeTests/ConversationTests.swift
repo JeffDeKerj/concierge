@@ -22,3 +22,21 @@ struct ConversationTests {
         #expect(!Conversation.spokenPrompt("Hi", context: nil).contains("About this alert"))
     }
 }
+
+struct WindowCommandTests {
+    @Test(arguments: ["Show your face please", "show yourself.", "Come up", "Where are you?", "please come to the front"])
+    func showsTheWindow(_ said: String) {
+        #expect(Conversation.windowCommand(said) == .show)
+    }
+
+    @Test(arguments: ["Hide", "hide the window please", "Go away.", "ok go to the back"])
+    func hidesTheWindow(_ said: String) {
+        #expect(Conversation.windowCommand(said) == .hide)
+    }
+
+    @Test(arguments: ["What's on tomorrow?", "Did Declan come up with the return yet in his last email to me",
+                      "Should I hide the reminder for B12", "Draft a reply"])
+    func questionsAreNotCommands(_ said: String) {
+        #expect(Conversation.windowCommand(said) == nil)
+    }
+}

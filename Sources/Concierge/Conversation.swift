@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Observation
 
@@ -94,6 +95,19 @@ final class Conversation {
                 ? firstQuestion
                 : await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
             guard !Task.isCancelled, let heard else { return }
+            switch Self.windowCommand(heard) {
+            case .show:
+                Self.showWindow()
+                await speak("Here I am.", settings)
+                continue
+            case .hide:
+                NSApp.hide(nil)
+                state = .speaking
+                _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
+                return
+            case nil:
+                break
+            }
             if Self.isGoodbye(heard) {
                 state = .speaking
                 _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
@@ -114,6 +128,32 @@ final class Conversation {
         if await io.say(text, voiceID: settings.voice, interruptible: settings.interruptible) == .interrupted {
             state = .listening(io.heard)
         }
+    }
+
+    enum WindowCommand: Equatable { case show, hide }
+
+    /// "Show your face", "come up", "hide" and the like: handled here, at
+    /// once, without asking the model.
+    nonisolated static func windowCommand(_ heard: String) -> WindowCommand? {
+        let words = heard.lowercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+        // A command is short; a longer sentence is a question that happens to use the words.
+        guard words.split(separator: " ").count <= 6 else { return nil }
+        let show = ["show your face", "show yourself", "show the window", "show me the window", "show up",
+                    "come up", "come forward", "come to the front", "bring up the window", "open the window",
+                    "open up", "where are you"]
+        let hide = ["hide", "hide yourself", "hide the window", "go to the back", "go away", "go back"]
+        if show.contains(where: { words.contains($0) }) { return .show }
+        if hide.contains(where: { words == $0 || words.hasPrefix($0 + " ") || words.hasSuffix(" " + $0) }) { return .hide }
+        return nil
+    }
+
+    /// Brings the window to the front, opening one if it was closed.
+    static func showWindow() {
+        // Opening the running app's own bundle is a reopen: macOS makes a
+        // window when there is none, and brings the app forward.
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: .init())
+        NSApp.unhide(nil)
+        NSApp.activate()
     }
 
     /// What the model reads for a spoken question.
