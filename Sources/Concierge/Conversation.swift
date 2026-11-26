@@ -29,10 +29,18 @@ final class Conversation {
     /// Starts a conversation. `opening` is said first: an alert Concierge
     /// starts the conversation with. `context` goes with the first question
     /// so the answer knows what "that" means.
-    func start(opening: String? = nil, context: String? = nil, quickReply: Bool = false) {
+    /// `firstQuestion` is a question already heard (after the wake word);
+    /// `greet` says "Yes?" before listening.
+    func start(opening: String? = nil, context: String? = nil, quickReply: Bool = false,
+               firstQuestion: String? = nil, greet: Bool = false) {
         guard !isActive else { return }
         error = nil
-        loop = Task { await run(opening: opening, context: context, quickReply: quickReply) }
+        // Active at once, so the wake listener lets go of the microphone.
+        state = .thinking
+        let opening = greet ? "Yes?" : opening
+        loop = Task {
+            await run(opening: opening, context: context, quickReply: quickReply, firstQuestion: firstQuestion)
+        }
     }
 
     /// An alert from the job runner: say it, then listen for a reply when
@@ -57,7 +65,7 @@ final class Conversation {
         state = .idle
     }
 
-    private func run(opening: String?, context: String?, quickReply: Bool) async {
+    private func run(opening: String?, context: String?, quickReply: Bool, firstQuestion: String?) async {
         defer {
             io.shutdown()
             state = .idle
@@ -82,7 +90,9 @@ final class Conversation {
             guard !Task.isCancelled else { return }
             state = .listening(io.heard)
             // After an alert, only a short wait: the owner may be busy.
-            let heard = await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
+            let heard = (turn == 0 && firstQuestion != nil)
+                ? firstQuestion
+                : await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
             guard !Task.isCancelled, let heard else { return }
             if Self.isGoodbye(heard) {
                 state = .speaking

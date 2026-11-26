@@ -5,6 +5,7 @@ import SwiftUI
 struct ConciergeApp: App {
     @State private var model: AppModel
     @State private var conversation: Conversation
+    @State private var wake: WakeListener
 
     init() {
         // launchd starts the app with --tick to run the scheduled jobs: no window.
@@ -17,6 +18,9 @@ struct ConciergeApp: App {
         let conversation = Conversation(model: model)
         _model = State(initialValue: model)
         _conversation = State(initialValue: conversation)
+        let wake = WakeListener(conversation: conversation)
+        _wake = State(initialValue: wake)
+        wake.run()
         // Alerts from the job runner, said here so Concierge can hear the reply.
         DistributedNotificationCenter.default().addObserver(
             forName: Speaker.alertNotification, object: nil, queue: .main) { note in
