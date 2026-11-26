@@ -217,14 +217,27 @@ final class VoiceIO {
     /// Returns their words, or nil when nothing was said for `waitForSpeech`.
     func listen(waitForSpeech: TimeInterval) async -> String? {
         if task == nil { beginTurn() }
+        let waitingSince = turnStarted
         while true {
             try? await Task.sleep(for: .milliseconds(200))
             if Task.isCancelled { endTurn(); return nil }
             let quiet = Date().timeIntervalSince(lastChange)
-            if heard.isEmpty, Date().timeIntervalSince(turnStarted) > waitForSpeech || turnOver {
-                log.info("listen: nothing heard, turn over early \(self.turnOver)")
-                endTurn()
-                return nil
+            if heard.isEmpty {
+                if Date().timeIntervalSince(waitingSince) > waitForSpeech {
+                    log.info("listen: nothing heard")
+                    endTurn()
+                    return nil
+                }
+                // The recogniser can give up by itself with "No speech
+                // detected": at once when the wake-word listener lets go
+                // of the microphone as the conversation starts, or after a
+                // silence of its own choosing. How long to wait for speech
+                // is decided here, so listen on with a fresh turn.
+                if turnOver {
+                    log.info("listen: the recogniser gave up early, listening again")
+                    beginTurn()
+                }
+                continue
             }
             if !heard.isEmpty, quiet > endOfTurnPause || turnOver {
                 let words = heard

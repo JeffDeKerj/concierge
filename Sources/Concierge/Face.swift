@@ -121,6 +121,33 @@ enum Face {
     /// How long a change of expression takes.
     static let changeTime = 0.35
 
+    /// The face on its way from one expression to the next.
+    struct Motion {
+        private var from: Pose
+        private var to: Pose
+        private var changed = Date.distantPast
+
+        init(_ expression: Expression) {
+            from = Face.pose(for: expression)
+            to = from
+        }
+
+        /// Starts towards `expression` from wherever the face is at `now`, even mid-change.
+        mutating func change(to expression: Expression, at now: Date) {
+            from = pose(at: now)
+            to = Face.pose(for: expression)
+            changed = now
+        }
+
+        func pose(at now: Date) -> Pose {
+            from.mixed(with: to, Face.ease(now.timeIntervalSince(changed) / Face.changeTime))
+        }
+
+        /// The change is drawn at the full rate until then.
+        var changingUntil: Date { changed.addingTimeInterval(Face.changeTime + 0.1) }
+        func isChanging(at now: Date) -> Bool { now < changingUntil }
+    }
+
     /// Slow at both ends, 0 to 1.
     static func ease(_ t: Double) -> Double {
         let x = min(max(t, 0), 1)

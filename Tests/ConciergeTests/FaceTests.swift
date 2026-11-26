@@ -29,6 +29,23 @@ struct FaceMotionTests {
         #expect(half.eyeWidth > a.eyeWidth && half.eyeWidth < b.eyeWidth)
     }
 
+    @Test func aChangeOfExpressionStartsFromWhereTheFaceIs() {
+        let start = Date(timeIntervalSinceReferenceDate: 1000)
+        var motion = Face.Motion(.idle)
+        #expect(motion.pose(at: start) == Face.pose(for: .idle))
+        #expect(!motion.isChanging(at: start))
+        motion.change(to: .listening, at: start)
+        #expect(motion.isChanging(at: start.addingTimeInterval(0.2)))
+        let midway = motion.pose(at: start.addingTimeInterval(Face.changeTime / 2))
+        #expect(abs(midway.ears - 0.5) < 0.001)
+        // Interrupted halfway: it goes on from there, without a jump.
+        let turn = start.addingTimeInterval(Face.changeTime / 2)
+        motion.change(to: .thinking, at: turn)
+        #expect(motion.pose(at: turn) == midway)
+        #expect(motion.pose(at: turn.addingTimeInterval(1)) == Face.pose(for: .thinking))
+        #expect(!motion.isChanging(at: turn.addingTimeInterval(1)))
+    }
+
     @Test func itBlinksNowAndThenAndIsMostlyOpen() {
         let steps = (0..<6000).map { Face.blink(at: Double($0) * 0.01) }
         #expect(steps.allSatisfy { $0 >= 0 && $0 <= 1 })
@@ -116,6 +133,20 @@ struct VoiceLoudnessTests {
     }
 }
 
+@MainActor
+struct FaceStageTests {
+    @Test func onStageItIsInTheMiddleAndAtRestUnderItsSpotInTheBar() {
+        let size = CGSize(width: 600, height: 800)
+        #expect(StagedFace.centre(staged: true, restX: 180, in: size) == CGPoint(x: 300, y: 320))
+        let rest = StagedFace.centre(staged: false, restX: 180, in: size)
+        #expect(rest.x == 180)
+        // Above the top edge: hidden under the bar, where the resting face is.
+        #expect(rest.y + StagedFace.restSide / 2 <= 0)
+        // Before its spot is known it starts from the middle of the top edge.
+        #expect(StagedFace.centre(staged: false, restX: nil, in: size).x == 300)
+    }
+}
+
 /// Not a check: with FACE_SHEET set to a file path, draws every style in
 /// every expression into that PNG, to look at the faces without opening the app.
 @MainActor
@@ -161,7 +192,6 @@ struct FaceSheetTests {
         let others = Face.Style.allCases.filter { !Face.Style.animals.contains($0) }
         try save(sheet(others, from: 1), to: path)
         try save(sheet(Face.Style.animals, from: others.count + 1), to: path.replacingOccurrences(of: ".png", with: "-animals.png"))
-        try save(PlacesSheet(), to: path.replacingOccurrences(of: ".png", with: "-places.png"))
     }
 
     private func save(_ view: some View, to path: String) throws {
@@ -170,111 +200,5 @@ struct FaceSheetTests {
         let image = try #require(renderer.nsImage)
         let bitmap = try #require(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
         try #require(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: path))
-    }
-}
-
-/// Small pictures of the window with the face in different places.
-private struct PlacesSheet: View {
-    private let lines: [CGFloat] = [120, 236, 244, 228, 240, 150, 0, 90, 232, 240, 180, 0, 70, 236, 200]
-
-    private func face(_ expression: Face.Expression, _ side: CGFloat) -> some View {
-        Canvas { context, size in
-            FaceDrawing(style: .robot, pose: Face.pose(for: expression), time: 1.2, level: 0.6).draw(in: &context, size: size)
-        }
-        .frame(width: side, height: side)
-    }
-
-    private func window(boxGap: CGFloat = 0, @ViewBuilder over: () -> some View) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.09, green: 0.10, blue: 0.12))
-            RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.14))
-            VStack(spacing: 0) {
-                HStack(spacing: 5) {
-                    ForEach(0..<3, id: \.self) { _ in Circle().fill(Color.white.opacity(0.22)).frame(width: 8, height: 8) }
-                    Text("Thursday 26 November").font(.system(size: 9)).foregroundStyle(.secondary).padding(.leading, 6)
-                    Spacer()
-                }
-                .frame(height: 30).padding(.horizontal, 10)
-                Color.white.opacity(0.1).frame(height: 1)
-                VStack(alignment: .leading, spacing: 7) {
-                    ForEach(Array(lines.enumerated()), id: \.offset) { _, width in
-                        RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(width == 0 ? 0 : 0.09)).frame(width: max(width, 1), height: 8)
-                    }
-                }
-                .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                Color.white.opacity(0.1).frame(height: 1)
-                HStack {
-                    Spacer().frame(width: boxGap)
-                    RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.22)).frame(height: 22)
-                        .overlay(alignment: .leading) {
-                            Text("Ask a follow-up…").font(.system(size: 9)).foregroundStyle(.tertiary).padding(.leading, 7)
-                        }
-                }
-                .padding(10)
-            }
-            over()
-        }
-        .frame(width: 280, height: 380)
-    }
-
-    private func option(_ name: String, _ note: String, @ViewBuilder picture: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            picture()
-            Text(name).font(.title3.bold()).foregroundStyle(.white)
-            Text(note).font(.callout).foregroundStyle(.secondary).frame(width: 280, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(width: 280, alignment: .topLeading)
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 26) {
-            option("A. Beside the question box", "Where it is now. Small, always in view, out of the page's way.") {
-                window(boxGap: 50) { face(.idle, 48).position(x: 34, y: 352) }
-            }
-            option("B. In the top bar", "Small, next to the date. It is the first thing you see, and the page keeps all its room.") {
-                window { face(.idle, 30).position(x: 188, y: 15) }
-            }
-            option("C. Hovering over the page", "Floats over a corner of the page and bobs gently. You can drag it anywhere, and it stays there.") {
-                window {
-                    face(.idle, 72).shadow(color: .black.opacity(0.6), radius: 8, y: 4).position(x: 226, y: 286)
-                }
-            }
-            option("D. It moves", "Rests small in the top bar. When you call it, it glides to the middle and grows while you talk, then goes back.") {
-                window {
-                    Color.black.opacity(0.45).clipShape(RoundedRectangle(cornerRadius: 12))
-                    face(.idle, 30).opacity(0.4).position(x: 188, y: 15)
-                    Path { p in
-                        p.move(to: CGPoint(x: 184, y: 34))
-                        p.addQuadCurve(to: CGPoint(x: 156, y: 106), control: CGPoint(x: 182, y: 78))
-                    }
-                    .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 5]))
-                    face(.listening, 130).position(x: 140, y: 180)
-                    Text("what's on tomorrow").font(.callout).foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 9))
-                        .position(x: 140, y: 262)
-                }
-            }
-            option("E. On the desktop", "When the window is hidden or covered, it appears in a corner of the screen instead. Already built; works with any of the others.") {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12).fill(LinearGradient(
-                        colors: [Color(red: 0.16, green: 0.20, blue: 0.30), Color(red: 0.10, green: 0.11, blue: 0.18)],
-                        startPoint: .top, endPoint: .bottom))
-                    RoundedRectangle(cornerRadius: 8).fill(Color(red: 0.20, green: 0.21, blue: 0.24))
-                        .frame(width: 200, height: 230).position(x: 116, y: 150)
-                        .overlay { Text("another app").font(.caption).foregroundStyle(.tertiary).position(x: 116, y: 150) }
-                    face(.listening, 84).position(x: 226, y: 318)
-                    Text("Listening…").font(.caption).foregroundStyle(.white)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                        .position(x: 226, y: 366)
-                }
-                .frame(width: 280, height: 380)
-            }
-        }
-        .padding(28)
-        .background(Color(red: 0.06, green: 0.07, blue: 0.08))
-        .environment(\.colorScheme, .dark)
     }
 }

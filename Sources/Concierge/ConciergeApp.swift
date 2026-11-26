@@ -7,6 +7,7 @@ struct ConciergeApp: App {
     @State private var conversation: Conversation
     @State private var wake: WakeListener
     @State private var face: FacePanel
+    @State private var place = FacePlace()
 
     init() {
         // launchd starts the app with --tick to run the scheduled jobs: no window.
@@ -40,6 +41,7 @@ struct ConciergeApp: App {
             ContentView()
                 .environment(model)
                 .environment(conversation)
+                .environment(place)
                 .preferredColorScheme(.dark)
                 .frame(minWidth: 560, minHeight: 600)
         }

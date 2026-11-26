@@ -41,8 +41,8 @@ struct ConciergeSettings: Codable, Equatable {
     /// Show the face in a corner of the screen when Concierge talks and its window is out of sight.
     var floatingFace = true
     /// Which character Concierge's face is: a `Face.Style`.
-    var face = Face.Style.robot.rawValue
-    var faceStyle: Face.Style { Face.Style(rawValue: face) ?? .robot }
+    var face = Face.Style.owl.rawValue
+    var faceStyle: Face.Style { Face.Style(rawValue: face) ?? .owl }
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
 

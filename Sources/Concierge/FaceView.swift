@@ -3,46 +3,147 @@ import SwiftUI
 /// Concierge's face, alive: it blinks, looks about, and moves smoothly from
 /// one expression to the next.
 struct FaceView: View {
-    var style: Face.Style = .robot
+    var style: Face.Style = .owl
     var expression: Face.Expression
     /// How loud Concierge's voice is at a moment, 0 to 1, when the app can
     /// measure it. Without it the mouth makes its own movement while speaking.
     var level: @MainActor (Date) -> Double? = { _ in nil }
+    /// A face that stays put is drawn as pictures on a plain layer, which
+    /// is what makes a face that is always on screen cheap. A face that
+    /// glides and grows is drawn by SwiftUI, so it can be animated.
+    var staysPut = true
 
     var body: some View {
-        OwnSurface(content: LivingFace(style: style, expression: expression, level: level))
-            .aspectRatio(1, contentMode: .fit)
-            // A picture only: clicks go to whatever holds it.
-            .allowsHitTesting(false)
+        Group {
+            if staysPut {
+                FacePicture(style: style, expression: expression, level: level)
+            } else {
+                LivingFace(style: style, expression: expression, level: level)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        // A picture only: clicks go to whatever holds it.
+        .allowsHitTesting(false)
     }
 }
 
-/// Gives its content a drawing surface of its own. The face is drawn again
-/// several times a second; inside the window's own surface each picture
-/// made the whole window work out its layout again.
-private struct OwnSurface<Content: View>: NSViewRepresentable {
-    var content: Content
+/// One picture of the face as a view, for turning into an image.
+private struct FaceStill: View {
+    var drawing: FaceDrawing
+    var side: CGFloat
 
-    func makeNSView(context: Context) -> NSHostingView<Content> {
-        let host = NSHostingView(rootView: content)
-        // The place it is given decides its size, not what it holds.
-        host.sizingOptions = []
-        return host
-    }
-
-    func updateNSView(_ host: NSHostingView<Content>, context: Context) {
-        host.rootView = content
+    var body: some View {
+        Canvas { context, size in
+            drawing.draw(in: &context, size: size)
+        }
+        .frame(width: side, height: side)
     }
 }
 
+/// The face as a plain AppKit view that puts one picture after the other
+/// on its layer. Drawn inside SwiftUI, each new picture made the window
+/// (and above all the top bar) work out its layout again, many times a
+/// second; a layer's picture can change without anything else noticing.
+private struct FacePicture: NSViewRepresentable {
+    var style: Face.Style
+    var expression: Face.Expression
+    var level: @MainActor (Date) -> Double?
+
+    func makeNSView(context: Context) -> PictureView {
+        let view = PictureView(expression: expression)
+        view.show(style: style, expression: expression, level: level)
+        return view
+    }
+
+    func updateNSView(_ view: PictureView, context: Context) {
+        view.show(style: style, expression: expression, level: level)
+    }
+
+    final class PictureView: NSView {
+        private var style = Face.Style.owl
+        private var expression: Face.Expression
+        private var level: @MainActor (Date) -> Double? = { _ in nil }
+        private var motion: Face.Motion
+        private var next: Timer?
+        private var watching: NSObjectProtocol?
+        private var renderer: ImageRenderer<FaceStill>?
+
+        init(expression: Face.Expression) {
+            self.expression = expression
+            motion = Face.Motion(expression)
+            super.init(frame: .zero)
+            wantsLayer = true
+            layer?.contentsGravity = .resizeAspect
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        func show(style: Face.Style, expression: Face.Expression, level: @escaping @MainActor (Date) -> Double?) {
+            if expression != self.expression {
+                motion.change(to: expression, at: Date())
+                self.expression = expression
+            }
+            self.style = style
+            self.level = level
+            draw()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+            // Out of sight it stops; back in sight it starts again.
+            watching = window.map { window in
+                NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification,
+                                                       object: window, queue: .main) { [weak self] _ in self?.draw() }
+            }
+            draw()
+        }
+
+        override func layout() {
+            super.layout()
+            draw()
+        }
+
+        /// Puts the picture for this moment on the layer, and comes back
+        /// when the next one is due.
+        private func draw() {
+            next?.invalidate()
+            next = nil
+            let side = min(bounds.width, bounds.height)
+            guard let window, window.occlusionState.contains(.visible), side > 0 else { return }
+            let now = Date(), time = now.timeIntervalSinceReferenceDate
+            let still = FaceStill(drawing: FaceDrawing(style: style, pose: motion.pose(at: now), time: time,
+                                                       level: level(now) ?? Face.babble(at: time)),
+                                  side: side)
+            let renderer = self.renderer ?? ImageRenderer(content: still)
+            self.renderer = renderer
+            renderer.content = still
+            renderer.scale = window.backingScaleFactor
+            layer?.contents = renderer.cgImage
+            let wait = Face.pictureInterval(expression, at: time, changing: motion.isChanging(at: now))
+            let timer = Timer(timeInterval: wait, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.draw() }
+            }
+            // Common modes: it keeps going while a menu is open or the window is dragged.
+            RunLoop.main.add(timer, forMode: .common)
+            next = timer
+        }
+
+        deinit {
+            next?.invalidate()
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+        }
+    }
+}
+
+/// The face drawn by SwiftUI itself, for when it must glide and grow.
 private struct LivingFace: View {
     var style: Face.Style
     var expression: Face.Expression
     var level: @MainActor (Date) -> Double?
 
-    @State private var from: Face.Pose
-    @State private var to: Face.Pose
-    @State private var changed = Date.distantPast
+    @State private var motion: Face.Motion
     /// Whether the window that holds the face can be seen.
     @State private var inSight = true
 
@@ -50,16 +151,14 @@ private struct LivingFace: View {
         self.style = style
         self.expression = expression
         self.level = level
-        _from = State(initialValue: Face.pose(for: expression))
-        _to = State(initialValue: Face.pose(for: expression))
+        _motion = State(initialValue: Face.Motion(expression))
     }
 
     var body: some View {
-        TimelineView(FaceSchedule(expression: expression, livelyUntil: changed.addingTimeInterval(Face.changeTime + 0.1),
-                                  paused: !inSight)) { timeline in
+        TimelineView(FaceSchedule(expression: expression, livelyUntil: motion.changingUntil, paused: !inSight)) { timeline in
             let now = timeline.date
             let time = now.timeIntervalSinceReferenceDate
-            let drawing = FaceDrawing(style: style, pose: pose(at: now), time: time,
+            let drawing = FaceDrawing(style: style, pose: motion.pose(at: now), time: time,
                                       level: level(now) ?? Face.babble(at: time))
             Canvas { context, size in
                 drawing.draw(in: &context, size: size)
@@ -67,16 +166,8 @@ private struct LivingFace: View {
         }
         .background(SightWatcher(inSight: $inSight))
         .onChange(of: expression) { _, new in
-            let now = Date()
-            // Start from wherever the face is now, even mid-change.
-            from = pose(at: now)
-            to = Face.pose(for: new)
-            changed = now
+            motion.change(to: new, at: Date())
         }
-    }
-
-    private func pose(at now: Date) -> Face.Pose {
-        from.mixed(with: to, Face.ease(now.timeIntervalSince(changed) / Face.changeTime))
     }
 }
 
@@ -157,7 +248,7 @@ struct FaceSchedule: TimelineSchedule {
 /// eyes with a sparkle, pink cheeks and a small mouth; what differs is the
 /// body they sit in.
 struct FaceDrawing {
-    var style: Face.Style = .robot
+    var style: Face.Style = .owl
     var pose: Face.Pose
     /// Seconds, for everything that moves by itself.
     var time: Double

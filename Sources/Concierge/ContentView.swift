@@ -41,19 +41,12 @@ struct ContentView: View {
 
             Divider()
             CostLine()
-            HStack(alignment: .bottom, spacing: 0) {
-                FaceButton()
-                    .padding(.leading, 12)
-                    .padding(.bottom, 6)
-                VStack(spacing: 0) {
-                    VoiceStrip()
-                    FollowUpPanel()
-                }
-            }
+            VoiceStrip()
+            FollowUpPanel()
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
+        .overlay { StagedFace() }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) { TalkButton() }
             ToolbarItem(placement: .primaryAction) { SilenceButton() }
             ToolbarItem(placement: .navigation) {
                 if let page = model.page {
@@ -61,6 +54,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            ToolbarItem(placement: .navigation) { FaceButton() }
             ToolbarItem(placement: .primaryAction) {
                 if model.isRefreshing {
                     HStack(spacing: 8) {
@@ -224,24 +218,6 @@ struct SilenceButton: View {
     }
 }
 
-/// The microphone in the toolbar: talk to Concierge, or stop talking.
-struct TalkButton: View {
-    @Environment(Conversation.self) private var talk
-
-    var body: some View {
-        Button {
-            talk.isActive ? talk.stop() : talk.start()
-        } label: {
-            Label(talk.isActive ? "Stop talking" : "Talk",
-                  systemImage: talk.isActive ? "mic.fill" : "mic")
-        }
-        .foregroundStyle(talk.isActive ? Color.accentColor : Color.primary)
-        .help(talk.isActive ? "Stop the conversation" : "Talk to Concierge (⌘T)")
-        .keyboardShortcut("t", modifiers: .command)
-        .accessibilityIdentifier("toolbar.talk")
-    }
-}
-
 /// One line above the question box while a spoken conversation runs.
 struct VoiceStrip: View {
     @Environment(Conversation.self) private var talk
@@ -250,9 +226,10 @@ struct VoiceStrip: View {
         if talk.isActive || talk.error != nil {
             HStack(spacing: 8) {
                 switch talk.state {
-                // The face beside it shows which of these it is; this says it in words.
-                case .listening(let words):
-                    Text(words.isEmpty ? "Listening…" : words).lineLimit(2)
+                // The face shows which of these it is, with the words it hears
+                // under it; this says it plainly and holds the Stop button.
+                case .listening:
+                    Text("Listening…")
                 case .thinking:
                     Text("Thinking…")
                 case .speaking:
@@ -273,10 +250,22 @@ struct VoiceStrip: View {
     }
 }
 
-/// Concierge's face beside the question box. It shows what Concierge is
-/// doing, sleeps while silenced, and a click starts or stops a conversation.
+/// Where the face is: the spot it rests at in the top bar, and whether it
+/// has left that spot for the middle of the window.
+@MainActor
+@Observable
+final class FacePlace {
+    /// The middle of the resting face, from the window's left edge.
+    var restX: CGFloat?
+    /// The face is on stage, or on its way back.
+    var away = false
+}
+
+/// Concierge's face in the top bar, where it rests. It shows what Concierge
+/// is doing, sleeps while silenced, and a click starts a conversation.
 struct FaceButton: View {
     @Environment(Conversation.self) private var talk
+    @Environment(FacePlace.self) private var place
     @State private var hovered = false
     @State private var s = ConciergeSettings.load()
     private var silenced: Bool { s.isSilenced() }
@@ -286,23 +275,162 @@ struct FaceButton: View {
             talk.isActive ? talk.stop() : talk.start()
         } label: {
             FaceView(style: s.faceStyle,
-                     expression: Face.expression(state: talk.state, hasError: talk.error != nil,
-                                                 silenced: silenced, hovered: hovered),
-                     level: { talk.voiceLevel(at: $0) })
-                .frame(width: 60, height: 60)
+                     expression: Face.expression(state: .idle, hasError: talk.error != nil,
+                                                 silenced: silenced, hovered: hovered))
+                .frame(width: 30, height: 30)
                 .contentShape(Rectangle())
+                // While it is on stage, its place in the bar is empty.
+                .opacity(place.away ? 0 : 1)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .help(talk.isActive ? "Stop the conversation" : silenced ? "Concierge is silenced. Click to talk anyway" : "Talk to Concierge (⌘T)")
+        .background(PlaceProbe { x in
+            if abs((place.restX ?? -1) - x) > 0.5 { place.restX = x }
+        })
+        .help(talk.isActive ? "Stop the conversation" : silenced ? "Concierge is silenced. Click to talk anyway (⌘T)" : "Talk to Concierge (⌘T)")
+        .keyboardShortcut("t", modifiers: .command)
         .accessibilityLabel(talk.isActive ? "Stop talking" : "Talk to Concierge")
-        .accessibilityIdentifier("face")
+        .accessibilityIdentifier("toolbar.talk")
         .onReceive(NotificationCenter.default.publisher(for: ConciergeSettings.changed)) { _ in
             s = ConciergeSettings.load()
         }
         // A silence ends by the clock.
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
             s = ConciergeSettings.load()
+        }
+    }
+}
+
+/// The face on stage. When a conversation starts it leaves the top bar,
+/// glides to the middle of the window and grows; what it hears shows under
+/// it. When the conversation ends it glides back. A click on it stops the
+/// conversation; the page around it stays usable.
+struct StagedFace: View {
+    @Environment(Conversation.self) private var talk
+    @Environment(FacePlace.self) private var place
+    @State private var staged = false
+    @State private var style = ConciergeSettings.load().faceStyle
+
+    static let stageSide: CGFloat = 150
+    static let restSide: CGFloat = 30
+
+    /// Where the middle of the face is, in a window area of `size`: on
+    /// stage a little above the middle, at rest just under its spot in
+    /// the top bar, out of sight.
+    static func centre(staged: Bool, restX: CGFloat?, in size: CGSize) -> CGPoint {
+        staged ? CGPoint(x: size.width / 2, y: size.height * 0.4)
+               : CGPoint(x: restX ?? size.width / 2, y: -restSide)
+    }
+
+    var body: some View {
+        GeometryReader { area in
+            if place.away {
+                let side = staged ? Self.stageSide : Self.restSide
+                Button {
+                    talk.stop()
+                } label: {
+                    FaceView(style: style,
+                             expression: Face.expression(state: talk.state, hasError: talk.error != nil,
+                                                         silenced: false, hovered: false),
+                             level: { talk.voiceLevel(at: $0) }, staysPut: false)
+                        .frame(width: side, height: side)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Stop the conversation")
+                .accessibilityIdentifier("face.stage")
+                // A soft shadow keeps it readable over the page's text.
+                .background {
+                    Circle()
+                        .fill(RadialGradient(colors: [.black.opacity(0.85), .black.opacity(0)],
+                                             center: .center, startRadius: side * 0.45, endRadius: side * 0.95))
+                        .frame(width: side * 1.9, height: side * 1.9)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .bottom) {
+                    if staged, case .listening(let words) = talk.state, !words.isEmpty {
+                        Text(words)
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .truncationMode(.head)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color(red: 0.06, green: 0.07, blue: 0.08).opacity(0.94),
+                                        in: RoundedRectangle(cornerRadius: 10))
+                            .frame(width: min(area.size.width - 40, 420))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .offset(y: 56)
+                            .allowsHitTesting(false)
+                            .accessibilityIdentifier("face.heard")
+                    }
+                }
+                .position(Self.centre(staged: staged, restX: place.restX, in: area.size))
+            }
+        }
+        .onChange(of: talk.isActive, initial: true) { _, active in
+            if active {
+                place.away = true
+                // On the next turn of the run loop, so the glide starts from its resting place.
+                DispatchQueue.main.async {
+                    withAnimation(.spring(duration: 0.6, bounce: 0.3)) { staged = true }
+                }
+            } else if place.away {
+                withAnimation(.spring(duration: 0.5, bounce: 0.1)) { staged = false }
+                Task {
+                    try? await Task.sleep(for: .seconds(0.55))
+                    if !talk.isActive { place.away = false }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ConciergeSettings.changed)) { _ in
+            style = ConciergeSettings.load().faceStyle
+        }
+    }
+}
+
+/// Reports where the middle of the view it sits behind is, from the
+/// window's left edge.
+private struct PlaceProbe: NSViewRepresentable {
+    var report: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> Probe {
+        let probe = Probe()
+        probe.report = report
+        return probe
+    }
+
+    func updateNSView(_ probe: Probe, context: Context) { probe.report = report }
+
+    final class Probe: NSView {
+        var report: (CGFloat) -> Void = { _ in }
+        private var watching: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+            watching = window.map { window in
+                NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification,
+                                                       object: window, queue: .main) { [weak self] _ in self?.tell() }
+            }
+            tell()
+        }
+
+        override func layout() {
+            super.layout()
+            tell()
+        }
+
+        private func tell() {
+            guard window != nil else { return }
+            let x = convert(bounds, to: nil).midX
+            // Not during a view update.
+            DispatchQueue.main.async { [report] in report(x) }
+        }
+
+        deinit {
+            if let watching { NotificationCenter.default.removeObserver(watching) }
         }
     }
 }
