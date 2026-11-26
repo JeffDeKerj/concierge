@@ -27,3 +27,4 @@ Resources/AppIcon.iconset/
 
 # macOS
 .DS_Store
+__pycache__/

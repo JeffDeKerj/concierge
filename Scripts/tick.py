@@ -28,7 +28,9 @@ NTFY = os.environ.get("CONCIERGE_NTFY", "https://apps.tailf7bf45.ts.net:31443/co
 DEFAULTS = dict(pausedOn=None, morning=True, checks=True, checkEveryMinutes=120, checkFrom="09:00",
                 checkTo="19:00", prep=True, prepMinutes=30, wrapup=True, wrapupAt="18:30",
                 notifyMac=True, notifyPhone=True, checkModel="haiku", prepModel="sonnet",
-                wrapupModel="sonnet")
+                wrapupModel="sonnet", speak=True, voice="", speakFrom="08:30", speakTo="21:00",
+                quietInEvents=True, silenceUntil=None)
+APP = os.environ.get("CONCIERGE_APP")  # set by the app's --tick launcher
 
 
 def read_json(path: Path, default):
@@ -92,10 +94,54 @@ def run(kind: str, prompt: str, model: str) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
-def notify(s: dict, entries: list) -> None:
-    for e in entries:
-        if not e.get("notify"):
+def in_event(now: dt.datetime, agenda: list) -> bool:
+    for ev in agenda:
+        try:
+            start, end = (dt.datetime.fromisoformat(ev[k]) for k in ("start", "end"))
+        except (KeyError, ValueError):
             continue
+        start, end = (t.astimezone().replace(tzinfo=None) if t.tzinfo else t for t in (start, end))
+        if start <= now < end:
+            return True
+    return False
+
+
+def may_speak(s: dict, now: dt.datetime, agenda: list) -> bool:
+    """Whether Concierge may talk now. Pure, for tests."""
+    if not s["speak"]:
+        return False
+    if s.get("silenceUntil"):
+        try:
+            if now < dt.datetime.fromisoformat(s["silenceUntil"]):
+                return False
+        except ValueError:
+            pass
+    if not hm(s["speakFrom"]) <= now.time() <= hm(s["speakTo"]):
+        return False
+    return not (s["quietInEvents"] and in_event(now, agenda))
+
+
+def spoken(entries: list) -> str:
+    """What is said for the new notifying entries, plainly. Pure, for tests."""
+    lines = []
+    for e in entries:
+        title = str(e.get("title", "")).replace(" · ", ". ").strip()
+        text = str(e.get("text", "")).strip()
+        lines.append(f"{title}. {text}" if text else f"{title}.")
+    if len(lines) > 1:
+        lines.insert(0, f"{len(lines)} new things.")
+    return " ".join(lines)
+
+
+def say(s: dict, text: str) -> None:
+    cmd = [APP, "--say", s["voice"], text] if APP else ["say", text]
+    subprocess.run(cmd, capture_output=True, timeout=120)
+
+
+def notify(s: dict, entries: list, now: dt.datetime | None = None, agenda: list | None = None,
+           speaker=None) -> None:
+    entries = [e for e in entries if e.get("notify")]
+    for e in entries:
         title = str(e.get("title", "Concierge"))[:120]
         if s["notifyMac"]:
             script = f"display notification {json.dumps(title)} with title \"Concierge\""
@@ -106,6 +152,12 @@ def notify(s: dict, entries: list) -> None:
                 urllib.request.urlopen(req, timeout=10)
             except OSError:
                 pass
+    # Spoken last: the banners show at once, the voice takes a few seconds.
+    if entries and may_speak(s, now or dt.datetime.now(), agenda or []):
+        try:
+            (speaker or say)(s, spoken(entries))
+        except (OSError, subprocess.SubprocessError):
+            pass
 
 
 def main() -> int:
@@ -134,7 +186,7 @@ def main() -> int:
         else:
             state["wrapupDone"] = today
         state_path.write_text(json.dumps(state, indent=1))
-        notify(s, read_json(updates_path, [])[before:])
+        notify(s, read_json(updates_path, [])[before:], now, agenda)
     return 0
 
 

@@ -9,4 +9,5 @@ CONCIERGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/concierge-test.XXXXXX")"
 export CONCIERGE_DIR
 export CONCIERGE_CLAUDE_BIN="$PWD/Scripts/claude-stub.sh"
 trap 'rm -rf "$CONCIERGE_DIR"' EXIT
+python3 -I -m unittest discover -s Tests/python -q
 swift test "${SWIFT_TEST_FLAGS[@]}" "$@"

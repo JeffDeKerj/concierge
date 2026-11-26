@@ -45,6 +45,7 @@ struct ContentView: View {
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
         .toolbar {
+            ToolbarItem(placement: .primaryAction) { SilenceButton() }
             ToolbarItem(placement: .navigation) {
                 if let page = model.page {
                     Text(page.longDay)
@@ -176,5 +177,40 @@ struct FollowUpPanel: View {
             }
         }
         .padding(12)
+    }
+}
+
+/// The speaker in the toolbar: silence Concierge's voice for a while.
+struct SilenceButton: View {
+    @State private var s = ConciergeSettings.load()
+
+    var body: some View {
+        Menu {
+            if s.isSilenced() {
+                Button("Speak again") { change { $0.silence(until: nil) } }
+            } else {
+                Button("Silence for 1 hour") { change { $0.silence(until: Silence.forAnHour()) } }
+                Button("Silence until tomorrow") { change { $0.silence(until: Silence.untilTomorrow()) } }
+            }
+            Divider()
+            Toggle("Speak notifications", isOn: Binding(
+                get: { s.speak }, set: { on in change { $0.speak = on } }))
+        } label: {
+            Label("Voice", systemImage: quiet ? "speaker.slash" : "speaker.wave.2")
+        }
+        .help(quiet ? "Concierge is silent" : "Concierge speaks its notifications")
+        .accessibilityIdentifier("toolbar.silence")
+        .onAppear { s = ConciergeSettings.load() }
+        // Settings or the clock may have ended a silence.
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+            s = ConciergeSettings.load()
+        }
+    }
+
+    private var quiet: Bool { !s.speak || s.isSilenced() }
+
+    private func change(_ edit: (inout ConciergeSettings) -> Void) {
+        ConciergeSettings.update(edit)
+        s = ConciergeSettings.load()
     }
 }

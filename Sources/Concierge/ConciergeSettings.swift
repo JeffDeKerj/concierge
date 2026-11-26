@@ -22,6 +22,16 @@ struct ConciergeSettings: Codable, Equatable {
     var checkModel = "haiku"
     var prepModel = "sonnet"
     var wrapupModel = "sonnet"
+    /// Say notifications aloud, on the Mac only.
+    var speak = true
+    /// An `AVSpeechSynthesisVoice` identifier; empty means the best English voice.
+    var voice = ""
+    var speakFrom = "08:30"
+    var speakTo = "21:00"
+    /// Stay quiet while an event of today's agenda is on.
+    var quietInEvents = true
+    /// Local "YYYY-MM-DDTHH:MM": nothing is said before then.
+    var silenceUntil: String? = nil
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
 
@@ -43,11 +53,43 @@ struct ConciergeSettings: Codable, Equatable {
     }
 
     var pausedToday: Bool { pausedOn == BriefingLocator.today() }
+
+    static let minuteFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f
+    }()
+
+    func isSilenced(at now: Date = Date()) -> Bool {
+        guard let until = silenceUntil.flatMap(Self.minuteFormat.date(from:)) else { return false }
+        return now < until
+    }
+
+    mutating func silence(until date: Date?) {
+        silenceUntil = date.map(Self.minuteFormat.string(from:))
+    }
+
+    /// Edits the saved settings in place, for controls outside the Settings window.
+    static func update(_ change: (inout ConciergeSettings) -> Void) {
+        var s = load()
+        change(&s)
+        s.save()
+    }
+}
+
+/// The silence choices, shared by the window's speaker button and Settings.
+enum Silence {
+    static func forAnHour(from now: Date = Date()) -> Date { now.addingTimeInterval(3600) }
+    static func untilTomorrow(from now: Date = Date()) -> Date {
+        Calendar.current.startOfDay(for: now).addingTimeInterval(86400)
+    }
 }
 
 struct SettingsView: View {
     @State private var s = ConciergeSettings.load()
     private let models = ["haiku", "sonnet", "opus"]
+    private let voices = Speaker.voices()
 
     var body: some View {
         Form {
@@ -83,10 +125,44 @@ struct SettingsView: View {
             Section("Tell me") {
                 Toggle("Mac notification", isOn: $s.notifyMac)
                 Toggle("Phone (ntfy on spark)", isOn: $s.notifyPhone)
+                Toggle("Say it aloud on the Mac", isOn: $s.speak)
+            }
+            Section("Voice") {
+                Picker("Voice", selection: $s.voice) {
+                    Text("Best English voice").tag("")
+                    ForEach(voices, id: \.identifier) { Text(Speaker.label($0)).tag($0.identifier) }
+                }
+                Button("Test the voice") {
+                    Speaker.preview("Good morning. Stephane asks about the mutation assays in the MIT group.", voiceID: s.voice)
+                }
+                Text("Nicer voices: System Settings › Accessibility › Spoken Content › System voice › Manage Voices. Download a Premium English voice, then pick it here.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Speak between")
+                    Spacer()
+                    TextField("From", text: $s.speakFrom).labelsHidden().frame(width: 56)
+                    Text("and")
+                    TextField("To", text: $s.speakTo).labelsHidden().frame(width: 56)
+                }
+                Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
+                HStack {
+                    if s.isSilenced() {
+                        Text("Silenced until \(s.silenceUntil ?? "")".replacingOccurrences(of: "T", with: " "))
+                        Spacer()
+                        Button("Speak again") { s.silence(until: nil) }
+                    } else {
+                        Text("Silence")
+                        Spacer()
+                        Button("1 hour") { s.silence(until: Silence.forAnHour()) }
+                        Button("Until tomorrow") { s.silence(until: Silence.untilTomorrow()) }
+                    }
+                }
             }
         }
         .formStyle(.grouped)
         .frame(width: 440)
+        // The window's speaker button may have changed the file meanwhile.
+        .onAppear { s = ConciergeSettings.load() }
         .onChange(of: s) { _, new in new.save() }
     }
 }

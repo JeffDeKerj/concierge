@@ -18,6 +18,8 @@ enum TickLauncher {
         let extra = "/opt/homebrew/bin:/usr/local/bin:\(NSHomeDirectory())/.local/bin"
         env["PATH"] = env["PATH"].map { "\(extra):\($0)" } ?? "\(extra):/usr/bin:/bin:/usr/sbin:/sbin"
         env["CONCIERGE_DIR"] = Paths.project.path
+        // tick.py speaks through `<this binary> --say`.
+        env["CONCIERGE_APP"] = Bundle.main.executablePath ?? CommandLine.arguments[0]
         process.environment = env
         do {
             try process.run()

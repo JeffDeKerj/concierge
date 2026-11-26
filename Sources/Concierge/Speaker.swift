@@ -1,0 +1,67 @@
+import AVFoundation
+
+/// Concierge's voice: the Mac's own speech voices, so nothing said leaves the Mac.
+///
+/// The job runner speaks through the app's binary (`Concierge --say "…"`), so
+/// the voice chosen in Settings is the one heard, with no second voice list.
+enum Speaker {
+    static let flag = "--say"
+
+    /// English voices, best quality first. Premium and Enhanced voices appear
+    /// here once downloaded in System Settings › Accessibility › Spoken Content.
+    static func voices() -> [AVSpeechSynthesisVoice] {
+        AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("en") && !$0.voiceTraits.contains(.isNoveltyVoice) }
+            .sorted { ($0.quality.rawValue, $1.name) > ($1.quality.rawValue, $0.name) }
+    }
+
+    static func label(_ voice: AVSpeechSynthesisVoice) -> String {
+        let quality = switch voice.quality {
+        case .premium: " · Premium"
+        case .enhanced: " · Enhanced"
+        default: ""
+        }
+        let region = Locale.current.localizedString(forIdentifier: voice.language) ?? voice.language
+        return "\(voice.name) (\(region))\(quality)"
+    }
+
+    /// The saved voice, else the best English voice installed.
+    static func voice(id: String) -> AVSpeechSynthesisVoice? {
+        AVSpeechSynthesisVoice(identifier: id) ?? voices().first
+    }
+
+    static func utterance(_ text: String, voiceID: String) -> AVSpeechUtterance {
+        let u = AVSpeechUtterance(string: text)
+        u.voice = voice(id: voiceID)
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
+        return u
+    }
+
+    /// For the Test button in Settings.
+    @MainActor static let shared = AVSpeechSynthesizer()
+
+    @MainActor static func preview(_ text: String, voiceID: String) {
+        shared.stopSpeaking(at: .immediate)
+        shared.speak(utterance(text, voiceID: voiceID))
+    }
+
+    /// `Concierge --say <voice id> <text>`: speaks and returns when done.
+    static func runFromCommandLine(_ args: [String]) -> Int32 {
+        guard let i = args.firstIndex(of: flag), args.count > i + 2 else { return 2 }
+        let done = Finished()
+        let synth = AVSpeechSynthesizer()
+        synth.delegate = done
+        synth.speak(utterance(args[i + 2], voiceID: args[i + 1]))
+        let deadline = Date().addingTimeInterval(90)
+        while !done.flag && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return done.flag ? 0 : 1
+    }
+
+    private final class Finished: NSObject, AVSpeechSynthesizerDelegate {
+        var flag = false
+        func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) { flag = true }
+        func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) { flag = true }
+    }
+}
