@@ -71,3 +71,14 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
 - **Reopening** re-checks the folder: `NSApplication.didBecomeActiveNotification`
   calls `checkForNewPage`, so a page written by the scheduled task while the app
   sat in the background appears when the app comes forward.
+- **Voice.** `Speaker.swift` lists English voices best first (Premium,
+  Enhanced) and speaks for `--say`; a running window takes the alert over a
+  distributed notification so it can listen afterwards. `Conversation.swift`
+  runs the spoken loop on `VoiceIO.swift` (one engine, echo cancellation,
+  interrupting); `WakeListener.swift` waits for "Concierge", on-device only.
+  Speaking rules (hours, events, silence) are in `tick.py` and tested in
+  `Tests/python`. Settings keys: `speak`, `voice`, `speakFrom`, `speakTo`,
+  `quietInEvents`, `silenceUntil`, `listenAfter`, `interruptible`, `wakeWord`.
+- **Scheduled jobs run through the app**: launchd starts
+  `Concierge --tick`, so Concierge's Full Disk Access covers WhatsApp, and
+  `tick.py` runs with Homebrew on PATH and `--no-session-persistence`.

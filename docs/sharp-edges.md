@@ -63,3 +63,20 @@ Traps and non-obvious constraints, one bullet each.
   Advisor Dev" (shared with the sibling apps) so a grant survives rebuilds; an
   ad-hoc build is a new app to macOS every time. `Scripts/make_signing_cert.sh`
   creates the identity if it is ever missing.
+- **Anthropic's safety filter stops briefing writes.** Chemistry and toxicology
+  wording from the paper digest trips it. A stopped reply saves nothing, so the
+  briefing skill writes the page in parts. Count stops with
+  `grep -l -- "stopped by a safety classifier" ~/.claude/projects/./-Users-jeffdekerj-code-swift-concierge/*.jsonl`.
+- **Voice processing needs the output side first.** `VoiceIO.start` touches
+  `outputNode` and `mainMixerNode` before `setVoiceProcessingEnabled(true)`,
+  or `engine.start()` fails with avfaudio error -10875. With voice processing
+  on, the input has several channels and only the first is the cleaned voice.
+- **`AVSpeechSynthesizer.write` can signal its end twice.** Resuming a
+  continuation on each empty buffer crashed the app; resume once.
+- **A cancelled recognition task reports its error late**, after the next turn
+  began. Tag callbacks with the turn and ignore stale ones, or a new turn ends
+  at once.
+- **`log show` keeps no debug lines.** Use `.info` for anything you need to
+  read back; `log show --last 5m --info --predicate 'subsystem == "local.jeffdekerj.concierge"'`.
+- **A briefing run started by hand is not in `runs.jsonl`.** The next question
+  that continues it is charged the whole conversation.
