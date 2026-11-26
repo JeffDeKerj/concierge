@@ -36,7 +36,7 @@ struct ConciergeSettings: Codable, Equatable {
     var listenAfter = true
     /// Talking over Concierge stops it and starts your turn.
     var interruptible = true
-    /// Listen for "Concierge" while the window is open.
+    /// Listen for "Concierge" while the app runs.
     var wakeWord = true
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
@@ -153,7 +153,7 @@ struct SettingsView: View {
                 Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
-                Toggle("Listen for \u{201C}Concierge\u{201D} while the window is open", isOn: $s.wakeWord)
+                Toggle("Listen for \u{201C}Concierge\u{201D} while Concierge is open", isOn: $s.wakeWord)
                 Text("Say \u{201C}Concierge\u{201D}, or \u{201C}Concierge, what\u{2019}s on tomorrow?\u{201D}. Recognition stays on this Mac. Paused while silenced.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {

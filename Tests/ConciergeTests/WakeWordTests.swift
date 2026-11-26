@@ -21,3 +21,10 @@ struct WakeWordTests {
         #expect(WakeListener.afterWakeWord("the Concierge app is good. Concierge, read my mail") == "read my mail")
     }
 }
+
+struct WakeSettleTests {
+    @Test func aShortTailWaitsLonger() {
+        #expect(WakeListener.settleTime(after: "Watson") > WakeListener.settleTime(after: "what's on tomorrow then"))
+        #expect(WakeListener.settleTime(after: "") == 2.0)
+    }
+}

@@ -4,7 +4,7 @@ import Speech
 
 private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "wake")
 
-/// Listens for "Concierge" while the window is open and no conversation is
+/// Listens for "Concierge" while the app runs (in front or not) and no conversation is
 /// going on, then starts one. Runs only with on-device recognition, so the
 /// always-open microphone never streams audio off the Mac. Paused while
 /// switched off in Settings or while Concierge is silenced.
@@ -60,6 +60,7 @@ final class WakeListener {
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
             self?.currentRequest.withLock { $0?.append(buffer) }
+            self?.bufferCount.withLock { $0 += 1 }
         }
         engine.prepare()
         do {
@@ -85,8 +86,12 @@ final class WakeListener {
 
     /// The request the audio thread appends to.
     private nonisolated let currentRequest = Locked<SFSpeechAudioBufferRecognitionRequest?>(nil)
+    /// Microphone buffers since the last request, for the log.
+    private nonisolated let bufferCount = Locked(0)
 
     private func newRequest() {
+        let buffers = bufferCount.withLock { n -> Int in defer { n = 0 }; return n }
+        log.info("wake: new request after \(buffers, privacy: .public) buffers, format \(self.engine.inputNode.outputFormat(forBus: 0).description, privacy: .public)")
         cancelRequest()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -100,6 +105,7 @@ final class WakeListener {
         task = recogniser?.recognitionTask(with: request) { [weak self] result, error in
             let text = result?.bestTranscription.formattedString
             let over = result?.isFinal == true || error != nil
+            if let error { log.info("wake: recognition ended: \(error.localizedDescription, privacy: .public)") }
             Task { @MainActor in
                 guard let self, mine == self.generation, self.listening else { return }
                 if let text { self.heard(text) }
@@ -125,7 +131,7 @@ final class WakeListener {
     /// over. Also starts a fresh request now and then, as long requests
     /// slow down and grow.
     private func tick() {
-        if let pending, Date().timeIntervalSince(pending.changed) > 1.2 {
+        if let pending, Date().timeIntervalSince(pending.changed) > Self.settleTime(after: pending.words) {
             let question = pending.words
             log.info("wake: heard the wake word")
             end()
@@ -133,6 +139,13 @@ final class WakeListener {
             return
         }
         if pending == nil, Date().timeIntervalSince(requestStarted) > 50 { newRequest() }
+    }
+
+    /// How long to wait for the words after the wake word to settle. The
+    /// recogniser corrects itself for a moment ("Watson" becomes "what's on
+    /// tomorrow"), so a short tail gets more time than a full question.
+    nonisolated static func settleTime(after words: String) -> TimeInterval {
+        words.split(separator: " ").count <= 2 ? 2.0 : 1.5
     }
 
     /// The words after "Concierge" (or "Hey Concierge"), or nil when it was not said.
