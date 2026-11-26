@@ -91,7 +91,7 @@ final class WakeListener {
 
     private func newRequest() {
         let buffers = bufferCount.withLock { n -> Int in defer { n = 0 }; return n }
-        log.info("wake: new request after \(buffers, privacy: .public) buffers, format \(self.engine.inputNode.outputFormat(forBus: 0).description, privacy: .public)")
+        log.debug("wake: new request after \(buffers, privacy: .public) buffers, format \(self.engine.inputNode.outputFormat(forBus: 0).description, privacy: .public)")
         cancelRequest()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -105,7 +105,7 @@ final class WakeListener {
         task = recogniser?.recognitionTask(with: request) { [weak self] result, error in
             let text = result?.bestTranscription.formattedString
             let over = result?.isFinal == true || error != nil
-            if let error { log.info("wake: recognition ended: \(error.localizedDescription, privacy: .public)") }
+            if let error { log.debug("wake: recognition ended: \(error.localizedDescription, privacy: .public)") }
             Task { @MainActor in
                 guard let self, mine == self.generation, self.listening else { return }
                 if let text { self.heard(text) }
