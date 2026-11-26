@@ -6,6 +6,7 @@ struct ConciergeApp: App {
     @State private var model: AppModel
     @State private var conversation: Conversation
     @State private var wake: WakeListener
+    @State private var face: FacePanel
 
     init() {
         // launchd starts the app with --tick to run the scheduled jobs: no window.
@@ -21,6 +22,9 @@ struct ConciergeApp: App {
         let wake = WakeListener(conversation: conversation)
         _wake = State(initialValue: wake)
         wake.run()
+        let face = FacePanel(conversation: conversation)
+        _face = State(initialValue: face)
+        face.run()
         // Alerts from the job runner, said here so Concierge can hear the reply.
         DistributedNotificationCenter.default().addObserver(
             forName: Speaker.alertNotification, object: nil, queue: .main) { note in

@@ -41,8 +41,15 @@ struct ContentView: View {
 
             Divider()
             CostLine()
-            VoiceStrip()
-            FollowUpPanel()
+            HStack(alignment: .bottom, spacing: 0) {
+                FaceButton()
+                    .padding(.leading, 12)
+                    .padding(.bottom, 6)
+                VStack(spacing: 0) {
+                    VoiceStrip()
+                    FollowUpPanel()
+                }
+            }
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
         .toolbar {
@@ -243,14 +250,12 @@ struct VoiceStrip: View {
         if talk.isActive || talk.error != nil {
             HStack(spacing: 8) {
                 switch talk.state {
+                // The face beside it shows which of these it is; this says it in words.
                 case .listening(let words):
-                    Image(systemName: "waveform").foregroundStyle(Color.accentColor)
                     Text(words.isEmpty ? "Listening…" : words).lineLimit(2)
                 case .thinking:
-                    ProgressView().controlSize(.small)
                     Text("Thinking…")
                 case .speaking:
-                    Image(systemName: "speaker.wave.2.fill").foregroundStyle(Color.accentColor)
                     Text("Speaking…")
                 case .idle:
                     Text(talk.error ?? "").foregroundStyle(.red).textSelection(.enabled)
@@ -264,6 +269,40 @@ struct VoiceStrip: View {
             .padding(.horizontal, 12)
             .padding(.top, 8)
             .accessibilityIdentifier("voice.strip")
+        }
+    }
+}
+
+/// Concierge's face beside the question box. It shows what Concierge is
+/// doing, sleeps while silenced, and a click starts or stops a conversation.
+struct FaceButton: View {
+    @Environment(Conversation.self) private var talk
+    @State private var hovered = false
+    @State private var s = ConciergeSettings.load()
+    private var silenced: Bool { s.isSilenced() }
+
+    var body: some View {
+        Button {
+            talk.isActive ? talk.stop() : talk.start()
+        } label: {
+            FaceView(style: s.faceStyle,
+                     expression: Face.expression(state: talk.state, hasError: talk.error != nil,
+                                                 silenced: silenced, hovered: hovered),
+                     level: { talk.voiceLevel(at: $0) })
+                .frame(width: 60, height: 60)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help(talk.isActive ? "Stop the conversation" : silenced ? "Concierge is silenced. Click to talk anyway" : "Talk to Concierge (⌘T)")
+        .accessibilityLabel(talk.isActive ? "Stop talking" : "Talk to Concierge")
+        .accessibilityIdentifier("face")
+        .onReceive(NotificationCenter.default.publisher(for: ConciergeSettings.changed)) { _ in
+            s = ConciergeSettings.load()
+        }
+        // A silence ends by the clock.
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+            s = ConciergeSettings.load()
         }
     }
 }

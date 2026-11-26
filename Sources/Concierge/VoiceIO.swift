@@ -42,6 +42,9 @@ final class VoiceIO {
     private var running = false
     /// Counts turns, so a late answer from a cancelled turn is ignored.
     private var turnNumber = 0
+    /// How loud the sentence being said is, step by step, and when it began.
+    private var loudness: [Float] = []
+    private var speakingSince: Date?
 
     /// Asks for the microphone and speech recognition, once.
     static func authorise() async throws {
@@ -105,6 +108,9 @@ final class VoiceIO {
                 if last { played.set() }
             }
         }
+        loudness = Self.loudness(of: buffers)
+        speakingSince = Date()
+        defer { speakingSince = nil }
         player.play()
         log.info("say: \(buffers.count) buffers, interruptible \(interruptible)")
         if interruptible { beginTurn() }
@@ -120,6 +126,50 @@ final class VoiceIO {
         log.info("say: finished, heard meanwhile \(self.heard, privacy: .private)")
         if interruptible { endTurn() }
         return .finished
+    }
+
+    /// How loud Concierge's voice is at `date`, 0 to 1, or nil when it is
+    /// not speaking. The face moves its mouth with this.
+    func level(at date: Date) -> Double? {
+        guard let since = speakingSince else { return nil }
+        let step = Int(date.timeIntervalSince(since) * Self.loudnessRate)
+        return loudness.indices.contains(step) ? Double(loudness[step]) : 0
+    }
+
+    /// Steps a second in the loudness of a sentence.
+    nonisolated static let loudnessRate = 30.0
+
+    /// The loudness of speech step by step, each 0 to 1 against the
+    /// loudest step of the sentence.
+    nonisolated static func loudness(of buffers: [AVAudioPCMBuffer]) -> [Float] {
+        var steps: [Float] = []
+        var sum: Float = 0
+        var count = 0
+        for buffer in buffers {
+            let perStep = max(1, Int(buffer.format.sampleRate / loudnessRate))
+            for i in 0..<Int(buffer.frameLength) {
+                let sample: Float
+                if let floats = buffer.floatChannelData {
+                    sample = floats[0][i]
+                } else if let ints = buffer.int16ChannelData {
+                    sample = Float(ints[0][i]) / 32768
+                } else if let ints = buffer.int32ChannelData {
+                    sample = Float(ints[0][i]) / 2_147_483_648
+                } else {
+                    return []
+                }
+                sum += sample * sample
+                count += 1
+                if count == perStep {
+                    steps.append((sum / Float(count)).squareRoot())
+                    sum = 0
+                    count = 0
+                }
+            }
+        }
+        guard let loudest = steps.max(), loudest > 0 else { return steps }
+        // The square root lifts the quiet parts, so the mouth moves on soft syllables too.
+        return steps.map { ($0 / loudest).squareRoot() }
     }
 
     /// The utterance as audio buffers, made faster than it plays.

@@ -17,6 +17,12 @@ final class Conversation {
     private(set) var error: String?
     var isActive: Bool { state != .idle }
 
+    /// How loud Concierge's voice is at `date`, 0 to 1, when it is known.
+    func voiceLevel(at date: Date) -> Double? { io.level(at: date) }
+
+    /// Sent just before the window is asked to come forward.
+    static let willShowWindow = Notification.Name("local.jeffdekerj.concierge.willShowWindow")
+
     private let model: AppModel
     private let io = VoiceIO()
     /// For alerts said without listening afterwards.
@@ -149,6 +155,7 @@ final class Conversation {
 
     /// Brings the window to the front, opening one if it was closed.
     static func showWindow() {
+        NotificationCenter.default.post(name: willShowWindow, object: nil)
         // Opening the running app's own bundle is a reopen: macOS makes a
         // window when there is none, and brings the app forward.
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: .init())

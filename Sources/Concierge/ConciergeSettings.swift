@@ -38,6 +38,11 @@ struct ConciergeSettings: Codable, Equatable {
     var interruptible = true
     /// Listen for "Concierge" while the app runs.
     var wakeWord = true
+    /// Show the face in a corner of the screen when Concierge talks and its window is out of sight.
+    var floatingFace = true
+    /// Which character Concierge's face is: a `Face.Style`.
+    var face = Face.Style.robot.rawValue
+    var faceStyle: Face.Style { Face.Style(rawValue: face) ?? .robot }
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
 
@@ -56,7 +61,11 @@ struct ConciergeSettings: Codable, Equatable {
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let data = try? e.encode(self) { try? data.write(to: url, options: .atomic) }
+        if url == Self.url { NotificationCenter.default.post(name: Self.changed, object: nil) }
     }
+
+    /// Sent when the saved settings change.
+    static let changed = Notification.Name("local.jeffdekerj.concierge.settingsChanged")
 
     var pausedToday: Bool { pausedOn == BriefingLocator.today() }
 
@@ -154,6 +163,10 @@ struct SettingsView: View {
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
                 Toggle("Listen for \u{201C}Concierge\u{201D} while Concierge is open", isOn: $s.wakeWord)
+                Picker("Face", selection: $s.face) {
+                    ForEach(Face.Style.allCases) { Text($0.name).tag($0.rawValue) }
+                }
+                Toggle("Show the face on screen when the window is out of sight", isOn: $s.floatingFace)
                 Text("Say \u{201C}Concierge\u{201D}, or \u{201C}Concierge, what\u{2019}s on tomorrow?\u{201D}. Recognition stays on this Mac. Paused while silenced.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
