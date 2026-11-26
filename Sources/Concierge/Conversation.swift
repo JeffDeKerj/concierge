@@ -4,8 +4,9 @@ import Observation
 /// A spoken back-and-forth with Concierge: it listens, asks the question box,
 /// says the answer, and listens again, until the owner stops or goes quiet.
 ///
-/// Turn-taking, not true duplex: it never listens while it speaks, so it
-/// cannot hear itself. The microphone button stops it at any moment.
+/// The owner can talk over it: it stops speaking and their words become the
+/// next question. Echo cancellation keeps it from hearing itself. The
+/// microphone button stops it at any moment.
 @MainActor
 @Observable
 final class Conversation {
@@ -16,7 +17,8 @@ final class Conversation {
     var isActive: Bool { state != .idle }
 
     private let model: AppModel
-    private let listener = Listener()
+    private let io = VoiceIO()
+    /// For alerts said without listening afterwards.
     private let voice = SpokenTurn()
     private var loop: Task<Void, Never>?
     /// The most turns in one conversation, as a guard against a runaway loop.
@@ -50,51 +52,57 @@ final class Conversation {
 
     func stop() {
         loop?.cancel()
-        listener.stop()
+        io.shutdown()
         voice.stop()
         state = .idle
     }
 
     private func run(opening: String?, context: String?, quickReply: Bool) async {
-        defer { state = .idle }
+        defer {
+            io.shutdown()
+            state = .idle
+        }
         do {
-            try await Listener.authorise()
+            try await VoiceIO.authorise()
+            try io.start()
         } catch {
             self.error = error.localizedDescription
             return
         }
         let settings = ConciergeSettings.load()
+        io.onWords = { [weak self] words in
+            guard let self, case .listening = self.state else { return }
+            self.state = .listening(words)
+        }
         if let opening {
-            state = .speaking
-            await voice.say(opening, voiceID: settings.voice)
+            await speak(opening, settings)
         }
         var context = context
         for turn in 0..<maxTurns {
             guard !Task.isCancelled else { return }
-            state = .listening("")
+            state = .listening(io.heard)
             // After an alert, only a short wait: the owner may be busy.
-            listener.waitForSpeech = (quickReply && turn == 0) ? 6 : 8
-            let heard: String?
-            do {
-                heard = try await listener.listen { [weak self] words in self?.state = .listening(words) }
-            } catch {
-                self.error = error.localizedDescription
-                return
-            }
-            guard !Task.isCancelled, let heard, !Self.isGoodbye(heard) else {
-                if let heard, Self.isGoodbye(heard) {
-                    state = .speaking
-                    await voice.say("Okay.", voiceID: settings.voice)
-                }
+            let heard = await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
+            guard !Task.isCancelled, let heard else { return }
+            if Self.isGoodbye(heard) {
+                state = .speaking
+                _ = await io.say("Okay.", voiceID: settings.voice, interruptible: false)
                 return
             }
             state = .thinking
             let reply = await model.ask(heard, prompt: Self.spokenPrompt(heard, context: context))
             context = nil
             guard !Task.isCancelled else { return }
-            state = .speaking
-            await voice.say(reply ?? "Sorry, I could not get an answer.", voiceID: settings.voice)
+            await speak(reply ?? "Sorry, I could not get an answer.", settings)
             if reply == nil { return }
+        }
+    }
+
+    /// Says something the owner may talk over, when Settings allows that.
+    private func speak(_ text: String, _ settings: ConciergeSettings) async {
+        state = .speaking
+        if await io.say(text, voiceID: settings.voice, interruptible: settings.interruptible) == .interrupted {
+            state = .listening(io.heard)
         }
     }
 

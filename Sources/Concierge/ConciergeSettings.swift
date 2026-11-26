@@ -34,6 +34,8 @@ struct ConciergeSettings: Codable, Equatable {
     var silenceUntil: String? = nil
     /// After saying an alert, listen a few seconds for a spoken reply.
     var listenAfter = true
+    /// Talking over Concierge stops it and starts your turn.
+    var interruptible = true
 
     static let url = Paths.briefings.appendingPathComponent("settings.json")
 
@@ -148,6 +150,7 @@ struct SettingsView: View {
                 }
                 Toggle("Stay quiet during calendar events", isOn: $s.quietInEvents)
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
+                Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
                 HStack {
                     if s.isSilenced() {
                         Text("Silenced until \(s.silenceUntil ?? "")".replacingOccurrences(of: "T", with: " "))
