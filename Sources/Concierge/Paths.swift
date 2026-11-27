@@ -1,7 +1,7 @@
 import Foundation
 
 /// Where things live. The project folder holds `briefings/` and is the working
-/// directory for every `claude` run, so `--continue` picks up the briefing run.
+/// directory for every `claude` run.
 enum Paths {
     static let project: URL = {
         if let dir = ProcessInfo.processInfo.environment["CONCIERGE_DIR"], !dir.isEmpty {

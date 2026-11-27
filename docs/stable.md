@@ -36,11 +36,18 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   project folder as working directory (`claude -p "/briefing" --output-format json`). A watcher checks the file's modification time
   every two seconds and reloads on change; one more check runs after exit. A
   non-zero exit, or an exit with no new file, is shown in red above the page.
-- **Follow-up** (`AppModel.ask`): the backend's continue command
-  (`claude -p --continue --output-format json <q>`). When the tool answers that
-  there is no conversation, the question is sent again as a fresh one,
-  prefixed with the path of the page on screen. Refused tools are listed by
-  name in the red line.
+- **Questions** (`AppModel.ask`, `AskSession.swift`): the question box and
+  the voice talk to a conversation of the app's own, never to a page build
+  or a check. The first question starts it (`claude -p --session-id <id>`)
+  and is told the page as plain words, today's updates and where the files
+  are; later ones resume it (`--resume <id>`) with only their own words,
+  plus any updates written since. The conversation is kept in
+  `briefings/state/ask.json` and replaced on a new day, a rebuilt page,
+  another agent, or when the tool no longer has it. Measured 2026-11-27 on
+  Haiku: a fresh question carries about 52,000 tokens and takes 4.5 s, where
+  one that continued a page build carried 135,000 to 195,000 and took 10 to
+  14 s. Agents that cannot name a conversation continue their latest one.
+  Refused tools are listed by name in the red line.
 - **Snooze.** A "⏱" under each item's "×" hides it until 06:00 tomorrow or next Monday (`until` in `dismissed.json`); expired snoozes are dropped by the app and brought back by the skill tagged BACK.
 - **Dismissed items** (`PageScript.swift`, `DismissStore.swift`): the app injects a
   script into every page that puts a "×" on each top-level item of the four

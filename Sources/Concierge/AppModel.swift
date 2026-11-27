@@ -58,6 +58,8 @@ final class AppModel {
     private(set) var askError: String?
     private(set) var lastAsk: RunReport?
     private let askRunner = AgentRunner()
+    /// The question box's own conversation, kept apart from page builds and checks.
+    private let askSessions = AskSessionStore()
 
     /// Cost and count of today's runs, from the log.
     private(set) var today: (costUSD: Double, runs: Int) = (0, 0)
@@ -202,8 +204,8 @@ final class AppModel {
 
     // MARK: Follow-up
 
-    /// Send the question to the most recent conversation in the project folder.
-    /// When there is none yet, start one that points at the page on screen.
+    /// Send the question to the app's own conversation. The first question of
+    /// the day, or after the page was rebuilt, starts one that is told the page.
     func ask() {
         let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !isAsking else { return }
@@ -231,12 +233,32 @@ final class AppModel {
         let sent = prompt ?? q
         defer { isAsking = false }
         do {
-            var output = try await askRunner.run(backend, arguments: backend.askArguments(question: sent, continuing: true, model: model))
-            var report = backend.parse(output)
-            if backend.isNoConversation(report) {
-                let intro = page.map { "Regarding the briefing page at \($0.url.path): " } ?? ""
-                output = try await askRunner.run(backend, arguments: backend.askArguments(question: intro + sent, continuing: false, model: model))
+            let day = BriefingLocator.today()
+            let pageStamp = page?.modificationDate?.timeIntervalSince1970
+            let updatesStamp = Updates.stamp(for: day)?.timeIntervalSince1970
+            let updates = Updates.json(for: day)
+            var session = askSessions.load().flatMap { $0.fits(day: day, backend: backend.id, pageStamp: pageStamp) ? $0 : nil }
+            var report = RunReport()
+            if let known = session {
+                // Tell a running conversation what the daytime jobs found since it last heard.
+                let news = known.updatesStamp == updatesStamp ? nil : AskContext.news(updates)
+                let text = (news.map { "(\($0))\n\n" } ?? "") + sent
+                let output = try await askRunner.run(backend, arguments: backend.askArguments(question: text, conversation: .resume(id: known.id), model: model))
                 report = backend.parse(output)
+                if backend.isNoConversation(report) { session = nil }
+            }
+            if session == nil {
+                let id = UUID().uuidString.lowercased()
+                let opening = AskContext.opening(pageHTML: page.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) },
+                                                 pagePath: page?.url.path, updatesJSON: updates,
+                                                 briefingsPath: Paths.briefings.path)
+                let output = try await askRunner.run(backend, arguments: backend.askArguments(question: opening + sent, conversation: .fresh(id: id), model: model))
+                report = backend.parse(output)
+                session = AskSession(id: report.sessionID ?? id, day: day, backend: backend.id, pageStamp: pageStamp)
+            }
+            if !report.isError, var kept = session {
+                kept.updatesStamp = updatesStamp
+                askSessions.save(kept)
             }
             record(kind: "ask", report)
             if report.isError {

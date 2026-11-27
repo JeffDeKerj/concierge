@@ -40,6 +40,11 @@ extension SerialTests {
         #expect(b.refreshArguments(model: "opus") == ["-p", "/briefing", "--output-format", "json", "--model", "opus"])
         #expect(b.askArguments(question: "Why?", continuing: true) == ["-p", "--continue", "--output-format", "json", "Why?"])
         #expect(b.askArguments(question: "Why?", continuing: false, model: "sonnet") == ["-p", "--output-format", "json", "--model", "sonnet", "Why?"])
+        #expect(b.askArguments(question: "Why?", conversation: .fresh(id: "a1"), model: "sonnet") == ["-p", "--session-id", "a1", "--output-format", "json", "--model", "sonnet", "Why?"])
+        #expect(b.askArguments(question: "Why?", conversation: .resume(id: "a1"), model: "") == ["-p", "--resume", "a1", "--output-format", "json", "Why?"])
+        // A tool that cannot name its conversations continues the latest one.
+        #expect(AntigravityBackend().askArguments(question: "Q", conversation: .resume(id: "x"), model: "") == ["-p", "Q", "--output-format", "json", "--continue"])
+        #expect(AntigravityBackend().askArguments(question: "Q", conversation: .fresh(id: "x"), model: "") == ["-p", "Q", "--output-format", "json"])
         #expect(b.defaultModel(for: .refresh) == "opus")
         #expect(b.defaultModel(for: .ask) == "sonnet")
         #expect(b.models.first == .cliDefault)

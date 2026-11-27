@@ -38,6 +38,17 @@ struct ClaudeBackend: AgentBackend {
         return args
     }
 
+    /// The app names the conversation, so a question never lands in a page
+    /// build or a check that happens to be the newest in the folder.
+    func askArguments(question: String, conversation: AskConversation, model: String) -> [String] {
+        var args = ["-p"]
+        switch conversation {
+        case .fresh(let id): args += ["--session-id", id]
+        case .resume(let id): args += ["--resume", id]
+        }
+        return args + ["--output-format", "json"] + modelArguments(model) + [question]
+    }
+
     private func modelArguments(_ model: String) -> [String] {
         model.isEmpty ? [] : ["--model", model]
     }

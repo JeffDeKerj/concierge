@@ -71,6 +71,9 @@ protocol AgentBackend {
     func refreshArguments(model: String) -> [String]
     /// Arguments for a follow-up; `continuing` resumes the latest conversation in the folder.
     func askArguments(question: String, continuing: Bool, model: String) -> [String]
+    /// Arguments for a question in the app's own conversation. A tool that
+    /// cannot name its conversations continues the latest one in the folder.
+    func askArguments(question: String, conversation: AskConversation, model: String) -> [String]
     /// Read the process output into a report.
     func parse(_ output: ProcessOutput) -> RunReport
     /// True when the failure means there is no conversation to continue.
@@ -90,6 +93,13 @@ extension AgentBackend {
 
     func isNoConversation(_ report: RunReport) -> Bool {
         report.isError && report.errorText.localizedCaseInsensitiveContains("no conversation")
+    }
+
+    func askArguments(question: String, conversation: AskConversation, model: String) -> [String] {
+        if case .resume = conversation {
+            return askArguments(question: question, continuing: true, model: model)
+        }
+        return askArguments(question: question, continuing: false, model: model)
     }
 
     var models: [ModelOption] { [.cliDefault] }

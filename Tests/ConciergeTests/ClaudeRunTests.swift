@@ -60,22 +60,72 @@ extension SerialTests {
         #expect(model.refreshError == "The generator finished but did not write today's page. It said: args: -p /briefing --output-format json --model opus")
     }
 
-    @Test @MainActor func askContinuesTheConversation() async throws {
+    @Test @MainActor func askStartsItsOwnConversationAndResumesIt() async throws {
         try Fixture.reset()
+        try Fixture.writePage(BriefingLocator.today(), body: "<style>b{}</style><h2>Urgent</h2><ul><li>Reply to <b>Declan</b> &amp; Ana</li></ul>")
         try Fixture.stubMode("echo")
         let model = AppModel()
         model.question = "What is the deadline?"
         model.ask()
         #expect(model.isAsking)
-        let done = await Fixture.wait { !model.isAsking }
-        #expect(done)
+        #expect(await Fixture.wait { !model.isAsking })
         #expect(model.askError == nil)
-        #expect(model.answer == "args: -p --continue --output-format json --model sonnet What is the deadline?")
+        let first = try #require(model.answer)
+        // A conversation of its own, named by the app, told the page as words.
+        #expect(first.hasPrefix("args: -p --session-id "))
+        #expect(!first.contains("--continue"))
+        #expect(first.contains("Urgent\nReply to Declan & Ana"))
+        #expect(!first.contains("<li>"))
+        #expect(first.hasSuffix("The question: What is the deadline?"))
         #expect(model.question.isEmpty)
         let report = try #require(model.lastAsk)
         #expect(report.costUSD == 0.0125)
         #expect(report.inputTokens == 5100)
         #expect(model.today.runs == 1)
+        #expect(AskSessionStore().load()?.id == "stub-session")
+
+        // The next question goes to the same conversation, with only its own words.
+        model.question = "And who asked?"
+        model.ask()
+        #expect(await Fixture.wait { !model.isAsking })
+        #expect(model.answer == "args: -p --resume stub-session --output-format json --model sonnet And who asked?")
+    }
+
+    @Test @MainActor func aRebuiltPageStartsANewConversation() async throws {
+        try Fixture.reset()
+        try Fixture.writePage(BriefingLocator.today())
+        try Fixture.stubMode("echo")
+        let model = AppModel()
+        AskSessionStore().save(AskSession(id: "old", day: BriefingLocator.today(), backend: "claude", pageStamp: 1))
+        model.question = "Anything new?"
+        model.ask()
+        #expect(await Fixture.wait { !model.isAsking })
+        #expect(try #require(model.answer).hasPrefix("args: -p --session-id "))
+    }
+
+    @Test @MainActor func newUpdatesAreToldToARunningConversation() async throws {
+        try Fixture.reset()
+        try Fixture.writePage(BriefingLocator.today())
+        try Fixture.stubMode("echo")
+        let model = AppModel()
+        model.question = "First"
+        model.ask()
+        #expect(await Fixture.wait { !model.isAsking })
+        let updates = Updates.url(for: BriefingLocator.today())
+        try FileManager.default.createDirectory(at: updates.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"[{"kind":"check","title":"Ana wrote"}]"#.write(to: updates, atomically: true, encoding: .utf8)
+        model.question = "Second"
+        model.ask()
+        #expect(await Fixture.wait { !model.isAsking })
+        let answer = try #require(model.answer)
+        #expect(answer.hasPrefix("args: -p --resume stub-session --output-format json --model sonnet (Found since the page was written"))
+        #expect(answer.contains("Ana wrote"))
+        #expect(answer.hasSuffix("Second"))
+        // Told once: the third question carries only its own words.
+        model.question = "Third"
+        model.ask()
+        #expect(await Fixture.wait { !model.isAsking })
+        #expect(model.answer == "args: -p --resume stub-session --output-format json --model sonnet Third")
     }
 
     @Test @MainActor func askFallsBackToAFreshConversation() async throws {
@@ -83,14 +133,17 @@ extension SerialTests {
         try Fixture.writePage("2026-11-22")
         try Fixture.stubMode("noconv")
         let model = AppModel()
+        let stamp = try #require(model.page?.modificationDate?.timeIntervalSince1970)
+        // A conversation the tool no longer has.
+        AskSessionStore().save(AskSession(id: "gone", day: BriefingLocator.today(), backend: "claude", pageStamp: stamp))
         model.question = "Who sent it?"
         model.ask()
-        let done = await Fixture.wait { !model.isAsking }
-        #expect(done)
+        #expect(await Fixture.wait { !model.isAsking })
         #expect(model.askError == nil)
         let answer = try #require(model.answer)
-        #expect(answer.hasPrefix("fallback: -p --output-format json --model sonnet Regarding the briefing page at "))
-        #expect(answer.hasSuffix("/briefings/2026-11-22.html: Who sent it?"))
+        #expect(answer.hasPrefix("fallback: -p --session-id "))
+        #expect(answer.contains("/briefings/2026-11-22.html"))
+        #expect(answer.hasSuffix("The question: Who sent it?"))
     }
 
     @Test @MainActor func emptyQuestionIsIgnored() throws {
