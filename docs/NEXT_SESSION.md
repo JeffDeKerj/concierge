@@ -28,15 +28,12 @@ count (`grep -l -- "stopped by a safety classifier"
    still stops it. The owner
    confirmed on 2026-11-26 that a click on the owl works with no bip and
    that "Nestor, what's on tomorrow?" is answered.
-2. **Try French.** The switch is built but has never heard French: this Mac
-   has no French speech recognition and only basic French voices. Settings ›
-   Voice has a **Download French** button (2026-11-27) that fetches the
-   dictation files itself; the owner presses it, nobody else. Not pressed
-   yet. Check that `Language.french.isOnThisMac` turns true after the
-   download (if it does not, recognise French with `DictationTranscriber`
-   instead of `SFSpeechRecognizer`), that the wake word then passes a French
-   question on, and how English names fare in French. A Premium French voice
-   is still to download.
+2. **Finish French.** It works: on 2026-11-27 the owner pressed Download
+   French in Settings › Voice, the files arrived, and "Nestor, qu'est-ce que
+   j'ai demain ?" was answered in French, on the Mac. Left to do: the owner
+   downloads a Premium French voice (it speaks with Thomas for now), and
+   nobody has checked talking over it in French, the French goodbyes, or how
+   English names fare in French.
 3. **Judge the Sonnet trial around 2026-12-03.** Compare filter stops and page
    quality with the Opus week. Keep Sonnet, or go back by deleting `model:` in
    `~/.claude/scheduled-tasks/morning-briefing/SKILL.md` and running
