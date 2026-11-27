@@ -68,6 +68,18 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   and `RunLog.Entry.sessionCostUSD` keep the running total the CLI reports;
   the entry's `costUSD` and the cost line show the difference from the last
   run of the same session.
+- **The page is not trusted** (`PageGuard.swift`). It is written by a model
+  that has just read mail and chats, so the app adds a rule as the first
+  thing in its head (`Content-Security-Policy: default-src 'none'`, with
+  the page's own `<style>` allowed): no picture, script, style sheet, font
+  or frame is fetched from anywhere. The page view shows only the page
+  itself; a clicked web or mail link opens in the browser; a page that
+  tries to go elsewhere by itself is refused. The app's own page script is
+  not held by the rule. `PageGuard.problems` looks the page over and the
+  window shows a yellow line for links outside the papers that go to sites
+  other than Google, Slack, GitHub, arXiv and doi.org, links that are not
+  plain `https`, and items with no `data-key`. `PageGuardLiveTests` loads
+  a hostile page in a real web view beside a listener and counts fetches.
 - **Scroll position** (`BriefingWebView`): the same file reloading keeps the
   reader's place; a different page or the first load starts at the top.
 - **Dark appearance** is forced twice: `NSApplication.shared.appearance` at

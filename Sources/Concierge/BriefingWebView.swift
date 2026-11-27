@@ -24,12 +24,17 @@ struct BriefingWebView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if action.navigationType == .linkActivated, let url = action.request.url {
-                NSWorkspace.shared.open(url)
+            // Only the page itself is shown here; a clicked link opens in the
+            // browser; a page that tries to go anywhere by itself is refused.
+            switch PageGuard.navigation(to: action.request.url, clicked: action.navigationType == .linkActivated) {
+            case .show:
+                decisionHandler(.allow)
+            case .openInBrowser:
+                if let url = action.request.url { NSWorkspace.shared.open(url) }
                 decisionHandler(.cancel)
-                return
+            case .refuse:
+                decisionHandler(.cancel)
             }
-            decisionHandler(.allow)
         }
 
         /// Where the previous copy of the same page was scrolled to, restored
@@ -145,7 +150,8 @@ struct BriefingWebView: NSViewRepresentable {
         let html: String
         let base: URL?
         if let page, let text = try? String(contentsOf: page.url, encoding: .utf8) {
-            html = text
+            // The page may load nothing from anywhere: see PageGuard.
+            html = PageGuard.guarded(text)
             base = Paths.briefings
         } else {
             html = Self.emptyPage

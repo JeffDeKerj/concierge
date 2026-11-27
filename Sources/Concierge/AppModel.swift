@@ -11,6 +11,9 @@ final class AppModel {
     private(set) var page: BriefingPage?
     /// One line shown above the page when it is not today's, or there is none.
     private(set) var notice: String?
+    /// What looks odd about the page on screen, one line each: links to
+    /// unknown places, items that cannot be dismissed for good.
+    private(set) var pageProblems: [String] = []
     /// Bumped whenever the web view must read the file again.
     private(set) var reloadToken = 0
     /// When Nestor last updated itself: the newest of the page being written
@@ -111,6 +114,7 @@ final class AppModel {
             notice = "No briefing yet. Press Refresh to build today's."
         }
         loadLastUpdated()
+        pageProblems = picked.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) }.map(PageGuard.problems(in:)) ?? []
     }
 
     private func loadLastUpdated() {

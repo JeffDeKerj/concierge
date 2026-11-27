@@ -16,6 +16,17 @@ struct ContentView: View {
                     .background(Color.white.opacity(0.04))
                     .accessibilityIdentifier("notice")
             }
+            if !model.pageProblems.isEmpty, !model.isRefreshing {
+                Text(model.pageProblems.joined(separator: "\n"))
+                    .font(.callout)
+                    .foregroundStyle(.yellow)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.yellow.opacity(0.06))
+                    .accessibilityIdentifier("pageProblems")
+            }
             if let error = model.refreshError {
                 // Capped: a generator that explains itself at length must not
                 // push the page off the window.
