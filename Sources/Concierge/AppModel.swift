@@ -58,6 +58,8 @@ final class AppModel {
     private(set) var askError: String?
     private(set) var lastAsk: RunReport?
     private let askRunner = AgentRunner()
+    /// Set when the owner stopped the answer being written.
+    private var askStopped = false
     /// The question box's own conversation, kept apart from page builds and checks.
     private let askSessions = AskSessionStore()
 
@@ -217,16 +219,44 @@ final class AppModel {
     /// already running. `prompt` is what the model reads when it differs from
     /// what the owner said (spoken questions ask for a short answer).
     @MainActor @discardableResult
-    func ask(_ q: String, prompt: String? = nil) async -> String? {
+    /// `onText` gets the answer piece by piece while it is written, when
+    /// the agent can send it that way.
+    func ask(_ q: String, prompt: String? = nil, onText: ((String) -> Void)? = nil) async -> String? {
         guard !isAsking else { return nil }
         isAsking = true
-        return await perform(q, prompt: prompt)
+        return await perform(q, prompt: prompt, onText: onText)
+    }
+
+    /// One run of the agent for a question. The answer shows as it is
+    /// written when the agent streams.
+    @MainActor
+    private func runAsk(_ backend: AgentBackend, _ text: String, _ conversation: AskConversation, model: String,
+                        onText: ((String) -> Void)?) async throws -> RunReport {
+        guard let streaming = backend.streamingAskArguments(question: text, conversation: conversation, model: model) else {
+            return backend.parse(try await askRunner.run(backend, arguments: backend.askArguments(question: text, conversation: conversation, model: model)))
+        }
+        // One reader, so the pieces stay in order.
+        let (lines, feed) = AsyncStream<String>.makeStream()
+        let reader = Task { @MainActor in
+            for await line in lines {
+                guard let piece = backend.textDelta(inLine: line) else { continue }
+                let soFar = (self.answer ?? "") + piece
+                if !soFar.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.answer = soFar }
+                onText?(piece)
+            }
+        }
+        defer { feed.finish() }
+        let output = try await askRunner.run(backend, arguments: streaming) { feed.yield($0) }
+        feed.finish()
+        await reader.value
+        return backend.parse(output)
     }
 
     @MainActor
-    private func perform(_ q: String, prompt: String?) async -> String? {
+    private func perform(_ q: String, prompt: String?, onText: ((String) -> Void)? = nil) async -> String? {
         askError = nil
         answer = nil
+        askStopped = false
         question = q
         let backend = self.backend
         let model = askModel
@@ -243,22 +273,26 @@ final class AppModel {
                 // Tell a running conversation what the daytime jobs found since it last heard.
                 let news = known.updatesStamp == updatesStamp ? nil : AskContext.news(updates)
                 let text = (news.map { "(\($0))\n\n" } ?? "") + sent
-                let output = try await askRunner.run(backend, arguments: backend.askArguments(question: text, conversation: .resume(id: known.id), model: model))
-                report = backend.parse(output)
-                if backend.isNoConversation(report) { session = nil }
+                report = try await runAsk(backend, text, .resume(id: known.id), model: model, onText: onText)
+                if backend.isNoConversation(report), !askStopped { session = nil }
             }
             if session == nil {
                 let id = UUID().uuidString.lowercased()
                 let opening = AskContext.opening(pageHTML: page.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) },
                                                  pagePath: page?.url.path, updatesJSON: updates,
                                                  briefingsPath: Paths.briefings.path)
-                let output = try await askRunner.run(backend, arguments: backend.askArguments(question: opening + sent, conversation: .fresh(id: id), model: model))
-                report = backend.parse(output)
+                report = try await runAsk(backend, opening + sent, .fresh(id: id), model: model, onText: onText)
                 session = AskSession(id: report.sessionID ?? id, day: day, backend: backend.id, pageStamp: pageStamp)
             }
-            if !report.isError, var kept = session {
+            if !report.isError || askStopped, var kept = session {
                 kept.updatesStamp = updatesStamp
                 askSessions.save(kept)
+            }
+            if askStopped {
+                // Stopped by the owner (the Stop button, or talking over it):
+                // what was written so far stands, and nothing is an error.
+                question = ""
+                return answer
             }
             record(kind: "ask", report)
             if report.isError {
@@ -275,6 +309,8 @@ final class AppModel {
     }
 
     func cancelAsk() {
+        guard isAsking else { return }
+        askStopped = true
         askRunner.stop()
     }
 

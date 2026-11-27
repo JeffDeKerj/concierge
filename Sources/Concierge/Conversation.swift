@@ -33,6 +33,8 @@ final class Conversation {
     /// For alerts said without listening afterwards.
     private let voice = SpokenTurn()
     private var loop: Task<Void, Never>?
+    /// When the first words of the answer being given started to sound.
+    private var firstWords: Date?
     /// The most turns in one conversation, as a guard against a runaway loop.
     private let maxTurns = 8
 
@@ -75,6 +77,7 @@ final class Conversation {
 
     func stop() {
         loop?.cancel()
+        model.cancelAsk()
         io.endConversation()
         voice.stop()
         state = .idle
@@ -152,11 +155,35 @@ final class Conversation {
             }
             state = .thinking
             let asked = Date()
-            let reply = await model.ask(heard, prompt: Self.spokenPrompt(heard, context: context, language: language))
-            log.notice("turn \(turn, privacy: .public): \(reply == nil ? "no answer" : "an answer", privacy: .public) after \(Int(Date().timeIntervalSince(asked)), privacy: .public) s of thinking")
+            // Each sentence is said as soon as it is written, while the rest still comes.
+            let (sentences, feed) = AsyncStream<String>.makeStream()
+            let cutter = SentenceCutter()
+            let question = Self.spokenPrompt(heard, context: context, language: language)
+            let noAnswer = language.noAnswer
+            let asking = Task { @MainActor () -> String? in
+                let reply = await self.model.ask(heard, prompt: question) { piece in
+                    for sentence in cutter.add(piece) { feed.yield(sentence) }
+                }
+                if let rest = cutter.finish() { feed.yield(rest) }
+                // An agent that sends nothing on the way gives its answer whole.
+                if cutter.emitted == 0 { feed.yield(reply ?? noAnswer) }
+                feed.finish()
+                return reply
+            }
+            firstWords = nil
+            let outcome = await io.say(parts: sentences, voiceID: settings.voiceID(for: language),
+                                    interruptible: settings.interruptible, in: language) { [weak self] in
+                self?.firstWords = Date()
+                self?.state = .speaking
+            }
+            if outcome == .interrupted {
+                state = .listening(io.heard)
+                model.cancelAsk()
+            }
+            let reply = await asking.value
+            log.notice("turn \(turn, privacy: .public): \(reply == nil ? "no answer" : "an answer", privacy: .public), first words after \(Int((self.firstWords ?? Date()).timeIntervalSince(asked)), privacy: .public) s, all of it after \(Int(Date().timeIntervalSince(asked)), privacy: .public) s")
             context = nil
             guard !Task.isCancelled else { return }
-            await speak(reply ?? language.noAnswer, settings, in: language)
             if reply == nil { return }
         }
     }

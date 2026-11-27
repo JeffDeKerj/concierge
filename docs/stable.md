@@ -89,6 +89,18 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   Speaking rules (hours, events, silence) are in `tick.py` and tested in
   `Tests/python`. Settings keys: `speak`, `voice`, `speakFrom`, `speakTo`,
   `quietInEvents`, `silenceUntil`, `listenAfter`, `interruptible`, `wakeWord`.
+- **Answers come in pieces** (`AgentRunner.run(onLine:)`,
+  `ClaudeBackend.streamingAskArguments`, `SentenceCutter.swift`). Claude is
+  asked with `--output-format stream-json --verbose
+  --include-partial-messages`; each `text_delta` line adds to the answer on
+  screen, and the last `result` line is the report. In a spoken
+  conversation `SentenceCutter` hands each whole sentence to
+  `VoiceIO.say(parts:)`, which says them one after the other under one
+  listening turn, so talking over any sentence stops it and stops the
+  agent (`AppModel.cancelAsk`, which is not an error). Measured 2026-11-27:
+  first words 4.8 s after the question, where the whole answer took 7 s
+  before any sound. `Concierge --ask "<question>" [--spoken]` asks from a
+  shell through the same path and prints each sentence with its time.
 - **Face.** `Face.swift` holds the rules as plain functions (expression from
   the conversation state, a pose per expression, blink, gaze, picture rate);
   `FaceView.swift` draws a pose in one of nine styles (`Face.Style`, default

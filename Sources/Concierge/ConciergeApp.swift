@@ -14,6 +14,8 @@ struct ConciergeApp: App {
         if CommandLine.arguments.contains(TickLauncher.flag) { exit(TickLauncher.run()) }
         // The job runner speaks notifications through the app: no window.
         if CommandLine.arguments.contains(Speaker.flag) { exit(Speaker.runFromCommandLine(CommandLine.arguments)) }
+        // A question from the command line, answered through the question box's own path: no window.
+        if CommandLine.arguments.contains(AskLauncher.flag) { exit(AskLauncher.run(CommandLine.arguments)) }
         // Dark everywhere, including AppKit chrome the SwiftUI scheme does not reach.
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
         let model = AppModel()

@@ -26,7 +26,10 @@ final class AgentRunner {
     /// Run the backend's binary with `arguments`, the project as working
     /// directory. Throws only when the binary is missing; a non-zero exit is
     /// returned so the backend can read the message.
-    func run(_ backend: AgentBackend, arguments: [String]) async throws -> ProcessOutput {
+    /// `onLine` gets each line of the output as soon as it is written, for
+    /// a tool that sends its answer in pieces.
+    func run(_ backend: AgentBackend, arguments: [String],
+             onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessOutput {
         guard let executable = backend.executable else {
             throw AgentError.missingExecutable(backend.displayName)
         }
@@ -57,8 +60,22 @@ final class AgentRunner {
         self.process = process
 
         // Drain both pipes off the main thread so a long answer never blocks the child.
-        let outTask = Task.detached(priority: .userInitiated) {
-            outPipe.fileHandleForReading.readDataToEndOfFile()
+        let outTask = Task.detached(priority: .userInitiated) { () -> Data in
+            guard let onLine else { return outPipe.fileHandleForReading.readDataToEndOfFile() }
+            var all = Data()
+            var pending = Data()
+            while true {
+                let chunk = outPipe.fileHandleForReading.availableData
+                if chunk.isEmpty { break }
+                all.append(chunk)
+                pending.append(chunk)
+                while let end = pending.firstIndex(of: 0x0A) {
+                    onLine(String(decoding: pending[pending.startIndex..<end], as: UTF8.self))
+                    pending.removeSubrange(pending.startIndex...end)
+                }
+            }
+            if !pending.isEmpty { onLine(String(decoding: pending, as: UTF8.self)) }
+            return all
         }
         let errTask = Task.detached(priority: .userInitiated) {
             errPipe.fileHandleForReading.readDataToEndOfFile()

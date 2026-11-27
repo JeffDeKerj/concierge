@@ -34,6 +34,27 @@ extension SerialTests {
         #expect(report.costUSD == nil)
     }
 
+    @Test func claudeReadsAStreamedAnswer() {
+        let b = ClaudeBackend()
+        #expect(b.streamingAskArguments(question: "Why?", conversation: .resume(id: "a1"), model: "haiku")
+            == ["-p", "--resume", "a1", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", "Why?"])
+        #expect(AntigravityBackend().streamingAskArguments(question: "Q", conversation: .fresh(id: "x"), model: "") == nil)
+        // Lines as the real tool wrote them on 2026-11-27.
+        let piece = #"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" is the first"}},"session_id":"s","parent_tool_use_id":null,"uuid":"u"}"#
+        #expect(b.textDelta(inLine: piece) == " is the first")
+        #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"message_start","message":{}},"parent_tool_use_id":null}"#) == "\n")
+        #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hm"}},"parent_tool_use_id":null}"#) == nil)
+        #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"helper"}},"parent_tool_use_id":"toolu_1"}"#) == nil)
+        #expect(b.textDelta(inLine: #"{"type":"assistant","message":{}}"#) == nil)
+        #expect(b.textDelta(inLine: "not json") == nil)
+        // The report is the last line.
+        let out = piece + "\n" + #"{"type":"result","is_error":false,"result":"One is the first.","session_id":"s","total_cost_usd":0.01,"num_turns":1}"# + "\n"
+        let report = b.parse(ProcessOutput(status: 0, stdout: out, stderr: ""))
+        #expect(report.text == "One is the first.")
+        #expect(report.costUSD == 0.01)
+        #expect(!report.isError)
+    }
+
     @Test func claudeArguments() {
         let b = ClaudeBackend()
         #expect(b.refreshArguments() == ["-p", "/briefing", "--output-format", "json"])

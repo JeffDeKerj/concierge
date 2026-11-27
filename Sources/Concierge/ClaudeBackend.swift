@@ -49,13 +49,41 @@ struct ClaudeBackend: AgentBackend {
         return args + ["--output-format", "json"] + modelArguments(model) + [question]
     }
 
+    /// `stream-json` with partial messages sends the answer word by word,
+    /// then the same report as `json` on the last line.
+    func streamingAskArguments(question: String, conversation: AskConversation, model: String) -> [String]? {
+        var args = askArguments(question: question, conversation: conversation, model: model)
+        guard let format = args.firstIndex(of: "json") else { return nil }
+        args.replaceSubrange(format...format, with: ["stream-json", "--verbose", "--include-partial-messages"])
+        return args
+    }
+
+    func textDelta(inLine line: String) -> String? {
+        guard line.contains("\"stream_event\""), let json = JSONReading.object(line),
+              json["type"] as? String == "stream_event", let event = json["event"] as? [String: Any],
+              // A helper agent's words are not the answer.
+              json["parent_tool_use_id"] == nil || json["parent_tool_use_id"] is NSNull else { return nil }
+        switch event["type"] as? String {
+        case "message_start":
+            // Words before and after a tool call are separate sentences.
+            return "\n"
+        case "content_block_delta":
+            guard let delta = event["delta"] as? [String: Any], delta["type"] as? String == "text_delta" else { return nil }
+            return delta["text"] as? String
+        default:
+            return nil
+        }
+    }
+
     private func modelArguments(_ model: String) -> [String] {
         model.isEmpty ? [] : ["--model", model]
     }
 
     func parse(_ output: ProcessOutput) -> RunReport {
         var report = RunReport()
-        guard let json = JSONReading.object(output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        // One object, or with streaming one object per line with the report last.
+        guard let json = JSONReading.object(output.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
+                ?? JSONReading.lines(output.stdout).last(where: { $0["type"] as? String == "result" }) else {
             report.text = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             report.isError = output.status != 0
             report.errorText = output.combined

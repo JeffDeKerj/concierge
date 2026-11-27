@@ -66,9 +66,14 @@ final class VoiceIO {
     private var turnLoudest = -120
     /// Counts turns, so a late answer from a cancelled turn is ignored.
     private var turnNumber = 0
-    /// How loud the sentence being said is, step by step, and when it began.
-    private var loudness: [Float] = []
-    private var speakingSince: Date?
+    /// The sentences being said: when each starts to sound, how long it
+    /// lasts and how loud it is step by step.
+    private var segments: [(start: Date, duration: TimeInterval, levels: [Float])] = []
+    /// Every sentence handed to the player in the current `say`, and
+    /// whether more may come and whether the owner is listened to.
+    private var sayingText = ""
+    private var moreToSay = false
+    private var listeningOver = false
 
     /// Asks for the microphone and speech recognition, once.
     static func authorise() async throws {
@@ -244,43 +249,88 @@ final class VoiceIO {
     /// stops as soon as the owner talks over it; their words so far stay
     /// in the open turn, which `listen` then finishes.
     func say(_ text: String, voiceID: String, interruptible: Bool, in spoken: Language? = nil) async -> Said {
-        let buffers = await synthesise(Speaker.utterance(text, voiceID: voiceID, language: spoken ?? language))
-        guard let format = buffers.first?.format, !Task.isCancelled else { return .finished }
-        engine.disconnectNodeOutput(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        let played = Flag()
-        for (i, buffer) in buffers.enumerated() {
-            let last = i == buffers.count - 1
-            player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
-                if last { played.set() }
+        let one = AsyncStream<String> { $0.yield(text); $0.finish() }
+        return await say(parts: one, voiceID: voiceID, interruptible: interruptible, in: spoken)
+    }
+
+    /// Says sentences as they come, one after the other: an answer is
+    /// spoken while the rest of it is still being written. `onFirst` is
+    /// called when the first one starts to sound. One listening turn covers
+    /// them all, so the owner can talk over any of them.
+    func say(parts: AsyncStream<String>, voiceID: String, interruptible: Bool, in spoken: Language? = nil,
+             onFirst: (() -> Void)? = nil) async -> Said {
+        let waiting = Locked(0)
+        sayingText = ""
+        moreToSay = true
+        listeningOver = false
+        segments = []
+        defer { segments = [] }
+        let producer = Task { @MainActor in
+            defer { self.moreToSay = false }
+            var audioEnd = Date()
+            var connected: AVAudioFormat?
+            for await part in parts {
+                let buffers = await self.synthesise(Speaker.utterance(part, voiceID: voiceID, language: spoken ?? self.language))
+                guard !Task.isCancelled else { return }
+                guard let format = buffers.first?.format else { continue }
+                if connected != format {
+                    self.engine.disconnectNodeOutput(self.player)
+                    self.engine.connect(self.player, to: self.engine.mainMixerNode, format: format)
+                    connected = format
+                }
+                waiting.withLock { $0 += buffers.count }
+                for buffer in buffers {
+                    self.player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
+                        waiting.withLock { $0 -= 1 }
+                    }
+                }
+                // A sentence sounds when the one before it has ended.
+                let start = max(Date(), audioEnd)
+                let duration = buffers.reduce(0.0) { $0 + Double($1.frameLength) } / format.sampleRate
+                audioEnd = start.addingTimeInterval(duration)
+                self.segments.append((start, duration, Self.loudness(of: buffers)))
+                if self.sayingText.isEmpty {
+                    onFirst?()
+                    if interruptible {
+                        self.beginTurn()
+                        self.listeningOver = true
+                    }
+                }
+                self.sayingText += (self.sayingText.isEmpty ? "" : " ") + part
+                self.player.play()
+                log.notice("say: \(buffers.count, privacy: .public) buffers, interruptible \(interruptible, privacy: .public)")
             }
         }
-        loudness = Self.loudness(of: buffers)
-        speakingSince = Date()
-        defer { speakingSince = nil }
-        player.play()
-        log.notice("say: \(buffers.count, privacy: .public) buffers, interruptible \(interruptible, privacy: .public)")
-        if interruptible { beginTurn() }
-        while !played.isSet {
+        while moreToSay || waiting.withLock({ $0 }) > 0 {
             try? await Task.sleep(for: .milliseconds(100))
-            if Task.isCancelled { player.stop(); endTurn(); return .finished }
-            if interruptible, Self.isBargeIn(heard: heard, speaking: text) {
+            if Task.isCancelled {
+                producer.cancel()
+                player.stop()
+                if listeningOver { endTurn() }
+                return .finished
+            }
+            if listeningOver, Self.isBargeIn(heard: heard, speaking: sayingText) {
                 log.notice("say: interrupted after \(Self.words(self.heard).count, privacy: .public) words")
+                producer.cancel()
                 player.stop()
                 return .interrupted
             }
         }
         log.notice("say: finished, heard meanwhile \(Self.words(self.heard).count, privacy: .public) words")
-        if interruptible { endTurn() }
+        if listeningOver { endTurn() }
         return .finished
     }
 
     /// How loud Concierge's voice is at `date`, 0 to 1, or nil when it is
     /// not speaking. The face moves its mouth with this.
     func level(at date: Date) -> Double? {
-        guard let since = speakingSince else { return nil }
-        let step = Int(date.timeIntervalSince(since) * Self.loudnessRate)
-        return loudness.indices.contains(step) ? Double(loudness[step]) : 0
+        guard !segments.isEmpty else { return nil }
+        for segment in segments where date >= segment.start && date < segment.start.addingTimeInterval(segment.duration) {
+            let step = Int(date.timeIntervalSince(segment.start) * Self.loudnessRate)
+            return segment.levels.indices.contains(step) ? Double(segment.levels[step]) : 0
+        }
+        // Between two sentences, or after the last.
+        return 0
     }
 
     /// Steps a second in the loudness of a sentence.

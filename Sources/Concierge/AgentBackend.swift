@@ -74,6 +74,11 @@ protocol AgentBackend {
     /// Arguments for a question in the app's own conversation. A tool that
     /// cannot name its conversations continues the latest one in the folder.
     func askArguments(question: String, conversation: AskConversation, model: String) -> [String]
+    /// The same, for a tool that can send its answer in pieces while it
+    /// writes it; nil when it cannot.
+    func streamingAskArguments(question: String, conversation: AskConversation, model: String) -> [String]?
+    /// The piece of the answer that one line of streamed output carries, if any.
+    func textDelta(inLine line: String) -> String?
     /// Read the process output into a report.
     func parse(_ output: ProcessOutput) -> RunReport
     /// True when the failure means there is no conversation to continue.
@@ -101,6 +106,9 @@ extension AgentBackend {
         }
         return askArguments(question: question, continuing: false, model: model)
     }
+
+    func streamingAskArguments(question: String, conversation: AskConversation, model: String) -> [String]? { nil }
+    func textDelta(inLine line: String) -> String? { nil }
 
     var models: [ModelOption] { [.cliDefault] }
     func defaultModel(for operation: Operation) -> String { "" }

@@ -10,11 +10,28 @@
 dir="${CONCIERGE_DIR:-$PWD}"
 mode=$(cat "$dir/stub-mode" 2>/dev/null || echo echo)
 
+ARGS=" $* "
 answer() { # $1 = result text, $2 = extra JSON fields (optional)
-  local text
   # The text may hold quotes and line ends (a question that carries the page).
-  text=$(printf '%s' "$1" | python3 -I -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read())[1:-1])')
-  printf '{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"num_turns":3,"result":"%s","session_id":"stub-session","total_cost_usd":0.0125,"usage":{"input_tokens":100,"cache_creation_input_tokens":2000,"cache_read_input_tokens":3000,"output_tokens":50},"modelUsage":{"claude-opus-5-5[1m]":{}},"permission_denials":[%s]}\n' "$text" "${2:-}"
+  # With `--output-format stream-json` the text comes first in two pieces,
+  # as the real tool sends it, then the report line.
+  printf '%s' "$1" | python3 -I -c '
+import json, sys
+text = sys.stdin.read()
+if " stream-json " in sys.argv[1]:
+    half = len(text) // 2
+    print(json.dumps({"type": "system", "subtype": "init"}))
+    print(json.dumps({"type": "stream_event", "event": {"type": "message_start"}, "parent_tool_use_id": None}))
+    for piece in (text[:half], text[half:]):
+        print(json.dumps({"type": "stream_event", "parent_tool_use_id": None,
+                          "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": piece}}}))
+print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "duration_ms": 1234, "num_turns": 3,
+                  "result": text, "session_id": "stub-session", "total_cost_usd": 0.0125,
+                  "usage": {"input_tokens": 100, "cache_creation_input_tokens": 2000,
+                            "cache_read_input_tokens": 3000, "output_tokens": 50},
+                  "modelUsage": {"claude-opus-5-5[1m]": {}},
+                  "permission_denials": json.loads("[" + sys.argv[2] + "]")}))
+' "$ARGS" "${2:-}"
 }
 
 case "$mode" in

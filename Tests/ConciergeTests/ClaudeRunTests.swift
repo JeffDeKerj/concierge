@@ -88,7 +88,22 @@ extension SerialTests {
         model.question = "And who asked?"
         model.ask()
         #expect(await Fixture.wait { !model.isAsking })
-        #expect(model.answer == "args: -p --resume stub-session --output-format json --model sonnet And who asked?")
+        #expect(model.answer == "args: -p --resume stub-session --output-format stream-json --verbose --include-partial-messages --model sonnet And who asked?")
+    }
+
+    @Test @MainActor func theAnswerArrivesInPieces() async throws {
+        try Fixture.reset()
+        try Fixture.stubMode("echo")
+        let model = AppModel()
+        var pieces: [String] = []
+        let reply = await model.ask("Tell me", prompt: "Tell me. Twice.") { pieces.append($0) }
+        // The stand-in sends a start, then the answer in two pieces, in order.
+        #expect(pieces.count == 3)
+        #expect(pieces.first == "\n")
+        #expect(pieces.joined().trimmingCharacters(in: .newlines) == reply)
+        #expect(try #require(reply).hasSuffix("The question: Tell me. Twice."))
+        #expect(model.answer == reply)
+        #expect(model.lastAsk?.costUSD == 0.0125)
     }
 
     @Test @MainActor func aRebuiltPageStartsANewConversation() async throws {
@@ -118,14 +133,14 @@ extension SerialTests {
         model.ask()
         #expect(await Fixture.wait { !model.isAsking })
         let answer = try #require(model.answer)
-        #expect(answer.hasPrefix("args: -p --resume stub-session --output-format json --model sonnet (Found since the page was written"))
+        #expect(answer.hasPrefix("args: -p --resume stub-session --output-format stream-json --verbose --include-partial-messages --model sonnet (Found since the page was written"))
         #expect(answer.contains("Ana wrote"))
         #expect(answer.hasSuffix("Second"))
         // Told once: the third question carries only its own words.
         model.question = "Third"
         model.ask()
         #expect(await Fixture.wait { !model.isAsking })
-        #expect(model.answer == "args: -p --resume stub-session --output-format json --model sonnet Third")
+        #expect(model.answer == "args: -p --resume stub-session --output-format stream-json --verbose --include-partial-messages --model sonnet Third")
     }
 
     @Test @MainActor func askFallsBackToAFreshConversation() async throws {
