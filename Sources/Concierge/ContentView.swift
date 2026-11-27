@@ -77,8 +77,9 @@ struct ContentView: View {
                 }
             }
         }
-        // The day sits under the name, where the top bar has room for it.
-        .navigationSubtitle(model.page?.longDay ?? "")
+        // The day sits under the name, where the top bar has room for it,
+        // with the time Nestor last updated itself.
+        .navigationSubtitle(TopLine.text(day: model.page?.longDay, updated: model.lastUpdated))
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The scheduled task may have written a new page while the app sat
             // in the background, or overnight.

@@ -14,7 +14,8 @@ and the wake listener keeps nothing in the system log. Since 2026-11-27 Nestor
 also listens and speaks in French, on the Mac: "Nestor, speak French" and
 "Nestor, parle anglais" switch, and Settings › Voice downloads French
 recognition itself. The morning page also has a "Keymodule on Slack"
-section, and the top bar shows the day under the name. Nestor keeps a
+section, and the top bar shows the day under the name, with the time
+Nestor last updated itself. Nestor keeps a
 short record of each conversation in the system log, numbers only, to read
 when it fails to hear (see Sharp edges). Session logs:
 [2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md),

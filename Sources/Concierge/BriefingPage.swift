@@ -22,6 +22,25 @@ struct BriefingPage: Equatable {
     }
 }
 
+/// The small line under the name in the top bar: the page's day, and when
+/// Nestor last updated itself.
+enum TopLine {
+    static func text(day: String?, updated: Date?, now: Date = Date()) -> String {
+        [day, updated.map { "updated \(time($0, now: now))" }]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// "13:07" today, "Thu 18:31" on another day, on the owner's clock.
+    static func time(_ date: Date, now: Date = Date()) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_GB")
+        f.timeZone = Paths.dayFormatter.timeZone
+        let sameDay = Paths.dayFormatter.string(from: date) == Paths.dayFormatter.string(from: now)
+        f.dateFormat = sameDay ? "HH:mm" : "EEE HH:mm"
+        return f.string(from: date)
+    }
+}
+
 enum BriefingLocator {
     static let dayPattern = try! NSRegularExpression(pattern: #"^\d{4}-\d{2}-\d{2}$"#)
 

@@ -13,6 +13,9 @@ final class AppModel {
     private(set) var notice: String?
     /// Bumped whenever the web view must read the file again.
     private(set) var reloadToken = 0
+    /// When Nestor last updated itself: the newest of the page being written
+    /// and a check, prep note, wrap-up or Refresh that finished well.
+    private(set) var lastUpdated: Date?
 
     // The agent
     var backendID: String = AgentBackends.current().id {
@@ -103,6 +106,11 @@ final class AppModel {
         } else {
             notice = "No briefing yet. Press Refresh to build today's."
         }
+        loadLastUpdated()
+    }
+
+    private func loadLastUpdated() {
+        lastUpdated = [log.lastUpdate(), page?.modificationDate].compactMap { $0 }.max()
     }
 
     /// Re-read the folder. Reloads the page when a newer file appeared or the
@@ -274,5 +282,6 @@ final class AppModel {
         let charged = log.append(kind: kind, backend: backendID, report: report)
         if kind == "refresh" { lastRefresh = charged } else { lastAsk = charged }
         today = log.total()
+        loadLastUpdated()
     }
 }

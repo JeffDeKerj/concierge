@@ -75,6 +75,12 @@ struct RunLog {
         }
     }
 
+    /// When Nestor last brought in something new: the newest run that
+    /// finished well and was not a question. A question only reads.
+    func lastUpdate() -> Date? {
+        entries().filter { $0.kind != "ask" && !$0.failed }.map(\.when).max()
+    }
+
     /// Cost and count of the runs on `day` (Europe/London), failed ones included.
     func total(on day: Date = Date()) -> (costUSD: Double, runs: Int) {
         let key = Paths.dayFormatter.string(from: day)
