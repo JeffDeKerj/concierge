@@ -79,3 +79,41 @@ count (`grep -l -- "stopped by a safety classifier"
     entry** in System Settings; Concierge has its own now.
 16. **Drop the toolchain pin** in `Scripts/swift-build-flags.sh` once plain
     `swift build` works again.
+
+Picks 17 to 21 come from an ideas review on 2026-11-27 (code, run log and
+web search). They were suggested as the first to build: each is small and
+fixes something seen. They sit at the end only so the numbers above hold.
+None is built or tested.
+
+17. **Give questions their own conversation.** A question continues the
+    newest conversation in the folder. After a page build that is the build
+    itself: each question in `briefings/runs.jsonl` carries 135,000 to
+    195,000 tokens, and the first one after a build waits 10 to 14 s. Start
+    the question conversation from the page's text, today's updates and the
+    agenda instead, and let the app name it with `--session-id` so it never
+    picks up a build or a check. Change `ClaudeBackend.askArguments` and
+    `AppModel.perform`.
+18. **Speak the answer as it arrives.** Today the whole answer is waited
+    for, then turned into sound in one go (`VoiceIO.say`). `claude -p
+    --output-format stream-json --verbose --include-partial-messages` sends
+    the text in pieces (`content_block_delta` with a `text_delta`): cut at
+    sentence ends and say each sentence at once. Talking over it must still
+    stop it.
+19. **Build the morning page from Nestor's own scheduler.** The 07:20 page
+    is built by a Claude desktop task: no retry, no catch-up after sleep,
+    and no line in `runs.jsonl`. The Mac was asleep at 07:20 on 2026-11-27.
+    The daytime checks already show a launchd run reaches Gmail and
+    WhatsApp. Add a `morning` job to `Scripts/tick.py` that runs once a day
+    after a set time when today's page is missing, then retire the desktop
+    task. Pick 12 (the phone notice) fits in the same place.
+20. **Check the page before showing it.** `BriefingWebView` blocks nothing:
+    a picture address inside a mail summary would be fetched, which is how
+    another mail assistant leaked mail. Refuse remote pictures and scripts
+    in the page view, and warn in the red line when a link goes somewhere
+    other than Gmail, Slack, GitHub, arXiv or the sites the skill names, or
+    when an item has no `data-key`.
+21. **Warn before the sign-in ends.** The Gmail, Calendar and Slack
+    connectors need the `/login` sign-in, which has an end date
+    (`claude auth status --text`, the line "Sign-in ends"). Have the
+    scheduler read it once a day and tell the owner ten days ahead. Also
+    say on the page when a source was down two days running.
