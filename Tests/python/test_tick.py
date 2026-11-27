@@ -41,6 +41,51 @@ class MaySpeak(unittest.TestCase):
         self.assertTrue(tick.may_speak(settings(), NOON.replace(hour=13), MEETING))
 
 
+SEVEN = dt.datetime(2026, 11, 26, 7, 30)
+
+
+class Morning(unittest.TestCase):
+    def kinds(self, s, state, now, written):
+        return [job[0] for job in tick.due_jobs(s, state, now, [], page_written=written)]
+
+    def test_builds_the_page_after_the_set_time_when_it_is_missing(self):
+        self.assertEqual(tick.due_jobs(settings(), {}, SEVEN, [], page_written=False),
+                         [("morning", "/briefing", "sonnet")])
+        self.assertEqual(self.kinds(settings(morningModel="opus", morningAt="07:45"), {}, SEVEN, False), [])
+
+    def test_not_when_the_page_is_there_or_the_switch_is_off(self):
+        self.assertEqual(self.kinds(settings(), {}, SEVEN, True), [])
+        self.assertEqual(self.kinds(settings(morning=False), {}, SEVEN, False), [])
+        self.assertEqual(self.kinds(settings(pausedOn="2026-11-26"), {}, SEVEN, False), [])
+
+    def test_a_mac_that_slept_builds_it_on_waking(self):
+        self.assertEqual(self.kinds(settings(), {}, NOON, False), ["morning", "check"])
+
+    def test_tries_again_after_a_pause_and_gives_up_after_three(self):
+        tried = lambda count, last: {"morning": {"day": "2026-11-26", "count": count, "last": last}}
+        self.assertEqual(self.kinds(settings(), tried(1, "2026-11-26T07:20:00"), SEVEN, False), [])
+        self.assertEqual(self.kinds(settings(), tried(1, "2026-11-26T07:20:00"), SEVEN.replace(minute=50), False),
+                         ["morning"])
+        self.assertEqual(self.kinds(settings(), tried(3, "2026-11-26T06:00:00"), SEVEN, False), [])
+        # Yesterday's tries do not count.
+        self.assertEqual(self.kinds(settings(), {"morning": {"day": "2026-11-25", "count": 3,
+                                                             "last": "2026-11-25T09:00:00"}}, SEVEN, False),
+                         ["morning"])
+
+    def test_a_half_written_page_counts_once_it_has_gone_stale(self):
+        import os, tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            page = Path(folder) / "2026-11-26.html"
+            self.assertFalse(tick.page_done(page, SEVEN))
+            page.write_text("<html><!-- S:urgent --></html>")
+            at = dt.datetime.fromtimestamp(page.stat().st_mtime)
+            # Being written right now: leave it alone.
+            self.assertTrue(tick.page_done(page, at + dt.timedelta(minutes=2)))
+            self.assertFalse(tick.page_done(page, at + dt.timedelta(minutes=11)))
+            page.write_text("<html>whole</html>")
+            self.assertTrue(tick.page_done(page, at + dt.timedelta(hours=1)))
+
+
 class Spoken(unittest.TestCase):
     def test_one_entry(self):
         self.assertEqual(tick.spoken([{"title": "MIT group · Stephane asks", "text": "About assays."}]),

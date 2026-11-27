@@ -6,6 +6,9 @@ struct ConciergeSettings: Codable, Equatable {
     /// "YYYY-MM-DD": nothing runs on that day, the morning page included.
     var pausedOn: String? = nil
     var morning = true
+    /// When the job runner builds the morning page, "HH:MM", and on which model.
+    var morningAt = "07:20"
+    var morningModel = "sonnet"
     var drafts = true
     var openItems = true
     var learn = true
@@ -138,6 +141,10 @@ struct SettingsView: View {
             }
             Section("Morning page") {
                 Toggle("Build the morning page", isOn: $s.morning)
+                TextField("At", text: $s.morningAt).frame(width: 70)
+                Picker("Model", selection: $s.morningModel) { ForEach(models, id: \.self) { Text($0) } }
+                Text("Built once a day when today\u{2019}s page is missing, also after the Mac slept through the time. Tried again twice if it fails.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Draft replies", isOn: $s.drafts)
                 Toggle("Follow open items across days", isOn: $s.openItems)
                 Toggle("Learn from what I dismiss", isOn: $s.learn)

@@ -3,8 +3,9 @@
 A small macOS app that opens on the morning briefing page. The page itself is
 built by the `briefing` skill in Claude Code (`~/.claude/skills/briefing/`),
 which writes `briefings/<YYYY-MM-DD>.html` from Gmail, Google Calendar,
-WhatsApp, the owner's work Slack and the Obsidian digests. A scheduled task in the Claude desktop app
-runs it every morning at about 07:20.
+WhatsApp, the owner's work Slack and the Obsidian digests. Nestor's own job runner
+(`Scripts/tick.py`, started by launchd every 15 minutes) builds it every
+morning at 07:20, or when the Mac next wakes.
 
 The app:
 

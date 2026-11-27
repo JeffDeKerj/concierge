@@ -111,8 +111,8 @@ Waiting on the owner or on something outside:
     nobody has checked talking over it in French, the French goodbyes, or how
     English names fare in French.
 19. **Judge the Sonnet trial around 2026-12-03.** Compare filter stops and page
-    quality with the Opus week. Keep Sonnet, or go back by deleting `model:` in
-    `~/.claude/scheduled-tasks/morning-briefing/SKILL.md` and running
+    quality with the Opus week. Keep Sonnet, or go back: choose Opus under
+    Settings › Morning page › Model (`morningModel`) and run
     `defaults delete local.jeffdekerj.concierge model.refresh.claude`.
 20. **The owner may remove the old `claude-assistant` Full Disk Access
     entry** in System Settings; Concierge has its own now.

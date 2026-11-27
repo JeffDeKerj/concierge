@@ -3,6 +3,7 @@
 itself, so a job that is switched off or paused costs no tokens.
 
 Jobs, each a Claude Code skill run headless in the project folder:
+  briefing          the morning page, when today's is not written yet
   concierge-check   new urgent things since the last look
   concierge-prep    a note before a calendar event (from briefings/agenda/<day>.json)
   concierge-wrapup  the evening summary
@@ -25,7 +26,8 @@ ROOT = Path(os.environ.get("CONCIERGE_DIR", Path(__file__).resolve().parent.pare
 B = ROOT / "briefings"
 CLAUDE = os.environ.get("CONCIERGE_CLAUDE_BIN", str(Path.home() / ".local/bin/claude"))
 NTFY = os.environ.get("CONCIERGE_NTFY", "https://apps.tailf7bf45.ts.net:31443/concierge")
-DEFAULTS = dict(pausedOn=None, morning=True, checks=True, checkEveryMinutes=120, checkFrom="09:00",
+DEFAULTS = dict(pausedOn=None, morning=True, morningAt="07:20", morningModel="sonnet", morningTries=3,
+                morningRetryMinutes=30, checks=True, checkEveryMinutes=120, checkFrom="09:00",
                 checkTo="19:00", prep=True, prepMinutes=30, wrapup=True, wrapupAt="18:30",
                 notifyMac=True, notifyPhone=True, checkModel="haiku", prepModel="sonnet",
                 wrapupModel="sonnet", speak=True, voice="", speakFrom="08:30", speakTo="21:00",
@@ -46,12 +48,45 @@ def hm(text: str) -> dt.time:
     return dt.time(int(h), int(m))
 
 
-def due_jobs(s: dict, state: dict, now: dt.datetime, agenda: list) -> list[tuple[str, str, str]]:
+def page_done(page: Path, now: dt.datetime) -> bool:
+    """Whether today's page is written. The skill writes it in parts, with a marker
+    where each part goes: a page that still has markers and has not changed for ten
+    minutes was left half-written by a run that died."""
+    try:
+        text = page.read_text(errors="replace")
+        changed = dt.datetime.fromtimestamp(page.stat().st_mtime)
+    except OSError:
+        return False
+    return "<!-- S:" not in text or now - changed < dt.timedelta(minutes=10)
+
+
+def morning_due(s: dict, state: dict, now: dt.datetime, page_written: bool) -> bool:
+    """Whether to build the morning page now: after the set time, while today's page
+    is missing, a few tries at most with a pause between them. A Mac that slept
+    through the set time builds the page at its first tick after waking. Pure, for tests."""
+    if not s["morning"] or page_written or now.time() < hm(s["morningAt"]):
+        return False
+    tries = state.get("morning") or {}
+    if tries.get("day") != now.date().isoformat():
+        return True
+    if tries.get("count", 0) >= s["morningTries"]:
+        return False
+    try:
+        last = dt.datetime.fromisoformat(tries["last"])
+    except (KeyError, ValueError):
+        return True
+    return now - last >= dt.timedelta(minutes=s["morningRetryMinutes"])
+
+
+def due_jobs(s: dict, state: dict, now: dt.datetime, agenda: list,
+             page_written: bool = True) -> list[tuple[str, str, str]]:
     """(kind, skill argument, model) for every job due now. Pure, for tests."""
     today = now.date().isoformat()
     if s.get("pausedOn") == today:
         return []
     jobs = []
+    if morning_due(s, state, now, page_written):
+        jobs.append(("morning", "/briefing", s["morningModel"]))
     if s["checks"] and hm(s["checkFrom"]) <= now.time() <= hm(s["checkTo"]):
         last = state.get("lastCheck")
         if not last or now - dt.datetime.fromisoformat(last) >= dt.timedelta(minutes=s["checkEveryMinutes"]):
@@ -177,10 +212,15 @@ def main() -> int:
     state = read_json(state_path, {})
     agenda = read_json(B / "agenda" / f"{today}.json", [])
     updates_path = B / "updates" / f"{today}.json"
-    for kind, prompt, model in due_jobs(s, state, now, agenda):
+    page = B / f"{today}.html"
+    for kind, prompt, model in due_jobs(s, state, now, agenda, page_done(page, now)):
         before = len(read_json(updates_path, []))
         run(kind, prompt, model)
-        if kind == "check":
+        if kind == "morning":
+            tries = state.get("morning") or {}
+            count = tries.get("count", 0) + 1 if tries.get("day") == today else 1
+            state["morning"] = {"day": today, "count": count, "last": now.isoformat()}
+        elif kind == "check":
             state["lastCheck"] = now.isoformat()
         elif kind == "prep":
             state.setdefault("prepDone", []).append(prompt.split(" ", 1)[1])

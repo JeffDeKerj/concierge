@@ -134,3 +134,12 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
 - **Scheduled jobs run through the app**: launchd starts
   `Concierge --tick`, so Concierge's Full Disk Access covers WhatsApp, and
   `tick.py` runs with Homebrew on PATH and `--no-session-persistence`.
+- **The morning page is one of those jobs** since 2026-11-27 (`morning_due`
+  in `tick.py`, Settings keys `morningAt` 07:20 and `morningModel` sonnet).
+  It runs `/briefing` at the first tick after the set time while today's
+  page is missing, so a Mac that slept through 07:20 builds it on waking.
+  A failed build is tried again after 30 minutes, three times a day at
+  most. A page left half-written (it still holds `<!-- S:` markers and has
+  not changed for ten minutes) counts as missing. Each build is a `morning`
+  line in `runs.jsonl`. The Claude desktop task `morning-briefing` that did
+  this before is switched off, not deleted.
