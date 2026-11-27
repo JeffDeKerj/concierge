@@ -104,6 +104,10 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   not on the Mac. "Speak French" / "parle anglais" switch by voice
   (`Language.asked`). Alerts are written and said in English.
   `Phrases.plain` strips accents and punctuation before phrases are matched.
+  `SpeechDownload.swift` fetches a language's recognition files from the
+  app (`AssetInventory`, macOS 26 and later) behind the `SpeechFiles`
+  protocol; it asks for the `DictationTranscriber` files, the ones
+  `SFSpeechRecognizer` uses on the Mac.
 - **Window commands by voice**: `Conversation.windowCommand` ("show your
   face", "hide"), handled before the model is asked.
 - **Scheduled jobs run through the app**: launchd starts

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Concierge
 
@@ -81,5 +82,76 @@ struct FrenchPhraseTests {
             }
         }
         #expect(Language.french.yes != Language.english.yes)
+    }
+}
+
+/// A store of speech files that answers as the test says.
+private final class FakeSpeechFiles: SpeechFiles, @unchecked Sendable {
+    var status: SpeechFilesStatus
+    var afterFetch: SpeechFilesStatus
+    var error: Error?
+    var steps: [Double] = []
+    private(set) var fetches = 0
+
+    init(_ status: SpeechFilesStatus, afterFetch: SpeechFilesStatus = .installed) {
+        self.status = status
+        self.afterFetch = afterFetch
+    }
+
+    func status(of language: Language) async -> SpeechFilesStatus { status }
+
+    func fetch(_ language: Language, progress: @escaping @Sendable (Double) -> Void) async throws {
+        fetches += 1
+        steps.forEach(progress)
+        if let error { throw error }
+        status = afterFetch
+    }
+}
+
+private struct Offline: LocalizedError {
+    var errorDescription: String? { "No internet connection." }
+}
+
+@MainActor
+struct SpeechDownloadTests {
+    @Test func itShowsWhereTheLanguageStands() async {
+        for (status, state) in [(SpeechFilesStatus.installed, SpeechDownload.State.installed),
+                                (.missing, .missing), (.unsupported, .unavailable)] {
+            let download = SpeechDownload(.french, files: FakeSpeechFiles(status))
+            #expect(download.state == .checking)
+            await download.refresh()
+            #expect(download.state == state)
+        }
+    }
+
+    @Test func aDownloadEndsInstalled() async {
+        let files = FakeSpeechFiles(.missing)
+        let download = SpeechDownload(.french, files: files)
+        await download.start()
+        #expect(download.state == .installed)
+        #expect(files.fetches == 1)
+    }
+
+    @Test func aFailedDownloadSaysWhyAndCanBeTriedAgain() async {
+        let files = FakeSpeechFiles(.missing)
+        files.error = Offline()
+        let download = SpeechDownload(.french, files: files)
+        await download.start()
+        #expect(download.state == .failed("No internet connection."))
+        // Looking again does not hide the reason.
+        await download.refresh()
+        #expect(download.state == .failed("No internet connection."))
+        files.error = nil
+        await download.start()
+        #expect(download.state == .installed)
+    }
+
+    @Test func aDownloadThatLeavesNothingIsAFailure() async {
+        let download = SpeechDownload(.french, files: FakeSpeechFiles(.missing, afterFetch: .missing))
+        await download.start()
+        guard case .failed = download.state else {
+            Issue.record("expected a failure, got \(download.state)")
+            return
+        }
     }
 }

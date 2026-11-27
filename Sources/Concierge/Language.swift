@@ -25,8 +25,8 @@ enum Language: String, CaseIterable, Identifiable {
     }
 
     /// Whether this Mac can recognise the language by itself, without
-    /// sending the sound to Apple. English can; French needs its dictation
-    /// language to be downloaded first.
+    /// sending the sound to Apple. English can; French needs its files
+    /// downloaded first, which Settings does.
     var isOnThisMac: Bool {
         SFSpeechRecognizer(locale: locale)?.supportsOnDeviceRecognition ?? false
     }
@@ -52,7 +52,7 @@ enum Language: String, CaseIterable, Identifiable {
     }
 
     /// Said, in English, when French is asked for and cannot be used.
-    static let frenchMissing = "French is not on this Mac yet. Add French in System Settings, under Keyboard, then Dictation. Or allow Apple's servers for French in my settings."
+    static let frenchMissing = "French is not on this Mac yet. Open my settings and press Download French. Or allow Apple's servers for French there."
 
     /// "Speak French", "parle anglais" and the like: the language asked
     /// for, or nil. A switch to French has to be said in English, and a

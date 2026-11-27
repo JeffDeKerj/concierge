@@ -98,3 +98,12 @@ Traps and non-obvious constraints, one bullet each.
   face's letters took most of 30% CPU). Draw such things as lines.
 - **A window that is covered shows a blank page in a screenshot**, and the
   face stops drawing by design. Bring the app forward before judging either.
+- **System Settings does not fetch French dictation on this Mac** (macOS
+  27.2.1, 2026-11-27). French (France) ticked under Keyboard › Dictation ›
+  Languages stays an online language: the Mac asks Apple for English files
+  only, and `Offline Dictation Status` keeps `fr-FR` at `Installed = 0`.
+  One try also failed with "no Internet connection" though the Mac was
+  online. Use the app's own download instead.
+- **A `.task` on a view that draws nothing never runs.** A row whose first
+  state was `EmptyView` never asked for its state, so the button never
+  showed. Put the task on a parent that is on screen.

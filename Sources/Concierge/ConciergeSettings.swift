@@ -125,6 +125,7 @@ struct SettingsView: View {
     private let voices = Speaker.voices()
     private let frenchVoices = Speaker.voices(for: .french)
     @State private var frenchHere = Language.french.isOnThisMac
+    @State private var frenchDownload = SpeechDownload(.french)
 
     var body: some View {
         Form {
@@ -182,7 +183,8 @@ struct SettingsView: View {
                 Picker("Language of conversations", selection: $s.language) {
                     ForEach(Language.allCases) { Text($0.name).tag($0.rawValue) }
                 }
-                if s.language == Language.french.rawValue {
+                let french = s.language == Language.french.rawValue
+                if french {
                     Picker("French voice", selection: $s.voiceFr) {
                         Text("Best French voice").tag("")
                         ForEach(frenchVoices, id: \.identifier) { Text(Speaker.label($0)).tag($0.identifier) }
@@ -190,9 +192,19 @@ struct SettingsView: View {
                     Button("Test the French voice") {
                         Speaker.preview(Language.french.sample, voiceID: s.voiceFr, language: .french)
                     }
-                    if !frenchHere {
-                        Text("French recognition is not on this Mac yet, so \(Brand.name) keeps to English. Add French in System Settings › Keyboard › Dictation › Languages, or switch on the choice below.")
+                }
+                // The download shows whichever language is chosen, so French
+                // can be made ready before switching to it.
+                if !frenchHere {
+                    if french {
+                        Text("French recognition is not on this Mac yet, so \(Brand.name) keeps to English. Download it, or switch on the choice below.")
                             .font(.caption).foregroundStyle(.orange)
+                    }
+                    FrenchDownloadRow(download: frenchDownload) {
+                        frenchHere = Language.french.isOnThisMac
+                        return frenchHere
+                    }
+                    if french {
                         Toggle("Use Apple\u{2019}s servers for French", isOn: $s.frenchOnline)
                         Text("Only while a conversation runs. Listening for \u{201C}\(Brand.name)\u{201D} always stays on this Mac.")
                             .font(.caption).foregroundStyle(.secondary)
@@ -232,6 +244,55 @@ struct SettingsView: View {
             frenchHere = Language.french.isOnThisMac
         }
         .onChange(of: s) { _, new in new.save() }
+        // Asked here, not in the row: a row that shows nothing yet never
+        // appears, so a task on it would never run.
+        .task { await frenchDownload.refresh() }
+    }
+}
+
+/// The button that fetches French recognition onto this Mac, and how the
+/// download is going.
+private struct FrenchDownloadRow: View {
+    let download: SpeechDownload
+    /// Asks whether the app can use French now, and says so.
+    let recheck: () -> Bool
+
+    var body: some View {
+        Group {
+            switch download.state {
+            case .checking:
+                EmptyView()
+            case .missing:
+                Button("Download French") { fetch() }
+                Text("Fetches French recognition from Apple, so French conversations stay on this Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            case .downloading(let fraction):
+                ProgressView(value: fraction) {
+                    Text("Downloading French: \(Int((fraction * 100).rounded())) %")
+                }
+            case .installed:
+                Text("French is downloaded. If \(Brand.name) still keeps to English, quit it and open it again.")
+                    .font(.caption).foregroundStyle(.secondary)
+            case .failed(let why):
+                Text("The download failed: \(why)")
+                    .font(.caption).foregroundStyle(.orange)
+                Button("Try the download again") { fetch() }
+            case .unavailable:
+                Text("This Mac cannot download French from here. Add French in System Settings › Keyboard › Dictation › Languages.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func fetch() {
+        Task {
+            await download.start()
+            guard download.state == .installed else { return }
+            // The app may see the new files a moment after they land.
+            for _ in 0..<20 where !recheck() {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
     }
 }
 
