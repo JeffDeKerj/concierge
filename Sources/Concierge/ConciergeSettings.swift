@@ -41,6 +41,8 @@ struct ConciergeSettings: Codable, Equatable {
     var interruptible = true
     /// Listen for the name while the app runs.
     var wakeWord = true
+    /// Which microphone Nestor listens on: a `Microphone` choice.
+    var microphone = Microphone.system
     /// The language of spoken conversations: a `Language`.
     var language = Language.english.rawValue
     /// The French voice; empty means the best French voice.
@@ -223,6 +225,12 @@ struct SettingsView: View {
                 Toggle("Listen for a reply after an alert", isOn: $s.listenAfter)
                 Toggle("Let me interrupt by talking over it", isOn: $s.interruptible)
                 Toggle("Listen for \u{201C}\(Brand.name)\u{201D} while \(Brand.name) is open", isOn: $s.wakeWord)
+                Picker("Microphone", selection: $s.microphone) {
+                    Text("The Mac\u{2019}s choice").tag(Microphone.system)
+                    Text("This Mac\u{2019}s own microphone").tag(Microphone.builtIn)
+                }
+                Text("A headset that is switched off but still plugged in sends silence, and \(Brand.name) then hears nothing. This Mac\u{2019}s own microphone always listens, and leaves a wireless headset in music quality.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Picker("Face", selection: $s.face) {
                     ForEach(Face.Style.allCases) { Text($0.name).tag($0.rawValue) }
                 }

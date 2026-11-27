@@ -129,6 +129,19 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   first words 4.8 s after the question, where the whole answer took 7 s
   before any sound. `Concierge --ask "<question>" [--spoken]` asks from a
   shell through the same path and prints each sentence with its time.
+- **Microphone choice** (`Microphone.swift`, Settings key `microphone`,
+  Settings › Voice › Microphone). "The Mac's choice" (the default) leaves
+  the engine on the Mac's input. "This Mac's own microphone" puts the
+  engine's input on the built-in one (`inputNode.auAudioUnit.setDeviceID`).
+  `VoiceIO.startEngine` tries the ways to start best first: the chosen
+  microphone with voice processing, the chosen one without it, then the
+  Mac's choice as before, each on a fresh `AVAudioEngine`, so a choice
+  that cannot start never leaves Nestor deaf. A changed choice starts a
+  fresh engine between conversations, with no restart of the app. The log
+  says "listening on <name>, voice processing <true|false>" at each start.
+  The wake listener asks again every 15 s for an engine that is not
+  running. Built 2026-11-27 with the owner away and the lid closed: left
+  on "The Mac's choice", and not yet tried by voice.
 - **Face.** `Face.swift` holds the rules as plain functions (expression from
   the conversation state, a pose per expression, blink, gaze, picture rate);
   `FaceView.swift` draws a pose in one of nine styles (`Face.Style`, default

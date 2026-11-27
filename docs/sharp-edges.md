@@ -116,6 +116,27 @@ Traps and non-obvious constraints, one bullet each.
   "nothing heard" at about -55 dBFS was a silent room; one at -15 dBFS or
   louder had sound the recogniser made no words of. The wake word's own
   lines stay out of the stored log, as before.
+- **A headset that is off still is the microphone, and sends silence.** On
+  2026-11-27, with the owner away, the Mac's input was the Shokz USB
+  adapter and every buffer was pure silence: -120 dBFS, where a quiet room
+  on a live microphone is about -58. Nestor then hears nothing at all, by
+  name or in a conversation. This is the likely cause of "Nestor did not
+  respond" that morning. The wake listener now writes one kept line when
+  the microphone has sent only silence for a minute ("has sent only
+  silence for a minute; Nestor cannot hear") and one when sound returns.
+  With the lid open the cure is Settings › Voice › Microphone › This Mac's
+  own microphone.
+- **A closed lid cuts the Mac's own microphone.** At the desk, lid closed on
+  the external screen, the built-in microphone also reads -120 dBFS. So
+  with the headset off there is no microphone at all, and no setting helps:
+  Nestor is deaf until the headset is on or the lid is open.
+- **Putting the engine on a named microphone is not reliable.** On
+  2026-11-27, lid closed, the built-in microphone with voice processing
+  started on a fresh launch and on the first switch, and failed on a later
+  switch with avfaudio error -10875 (and -10851 without voice processing).
+  An engine that was once put on a device also failed when put back on the
+  headset. So every way of starting gets a fresh `AVAudioEngine`, and the
+  last way is always the Mac's own choice. Not yet tried with the lid open.
 - **Sound-system errors at the start of a conversation mean nothing.** "failed
   to run downlink DSP (state fault)" and "failed to write uplink microphone
   input signal" appear when echo cancellation is switched on or off, in

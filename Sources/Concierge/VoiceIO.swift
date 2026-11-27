@@ -36,8 +36,10 @@ final class VoiceIO {
     /// The words of the turn so far.
     private(set) var heard = ""
 
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    /// Replaced by a fresh one when a way of starting failed or the owner
+    /// chose another microphone: a used engine keeps its device and fails.
+    private var engine = AVAudioEngine()
+    private var player = AVAudioPlayerNode()
     private let synth = AVSpeechSynthesizer()
     private let feed = Feed()
     private var recogniser: SFSpeechRecognizer?
@@ -102,7 +104,7 @@ final class VoiceIO {
     /// on, they took a quarter of a processor core all day. Bypassing keeps
     /// the engine as it is, so nothing is switched and the volume stays put.
     private func setProcessing() {
-        guard running else { return }
+        guard running, processing else { return }
         engine.inputNode.isVoiceProcessingBypassed = !holds.contains(.talk)
     }
 
@@ -131,17 +133,73 @@ final class VoiceIO {
         self.language = language
     }
 
+    /// Starts the engine on the microphone chosen in Settings. The Mac's
+    /// voice processing (echo cancelling) cannot run with the microphone on
+    /// one device and the sound on another (avfaudio error -10875), which is
+    /// what the Mac's own microphone with a headset is. So the ways to start
+    /// are tried best first: the chosen microphone with voice processing,
+    /// the chosen microphone without it (on a headset there is little echo
+    /// to cancel), and last the Mac's own choice as before, so listening is
+    /// never worse than with no choice made.
     private func startEngine() throws {
         guard !running else { return }
+        let choice = ConciergeSettings.load().microphone
+        let chosen = Microphone.device(for: choice)
+        var plans: [(device: AudioDeviceID?, processing: Bool)] = []
+        if let chosen { plans += [(chosen, true), (chosen, false)] }
+        plans.append((nil, true))
+        var failure: Error = Failure.unavailable
+        for plan in plans {
+            do {
+                try start(on: plan.device, processing: plan.processing)
+                microphone = choice
+                let inUse = plan.device ?? Microphone.systemInput()
+                microphoneName = inUse.flatMap(Microphone.name(of:)) ?? "the Mac's choice"
+                log.notice("listening on \(self.microphoneName, privacy: .public), voice processing \(plan.processing, privacy: .public)")
+                return
+            } catch {
+                failure = error
+                log.notice("the engine did not start on \(plan.device.flatMap(Microphone.name(of:)) ?? "the Mac's choice", privacy: .public), voice processing \(plan.processing, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                freshEngine()
+            }
+        }
+        // Remembered even so, or the listener would ask for a restart for ever.
+        microphone = choice
+        throw failure
+    }
+
+    /// A new engine with nothing set on it, so the next start is on the
+    /// Mac's own choice of devices unless told otherwise.
+    private func freshEngine() {
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        if let deviceChanges { NotificationCenter.default.removeObserver(deviceChanges) }
+        deviceChanges = nil
+        engine = AVAudioEngine()
+        player = AVAudioPlayerNode()
+        running = false
+    }
+
+    /// Whether the engine runs. It does not after a start that failed, and
+    /// whoever holds it then asks again with `hold`.
+    var isRunning: Bool { running }
+
+    /// One way of starting: the input on `device` (nil leaves it alone),
+    /// with or without the Mac's voice processing.
+    private func start(on device: AudioDeviceID?, processing: Bool) throws {
         // The output side must exist before voice processing is switched on,
         // or the engine fails to start (avfaudio error -10875).
         _ = engine.outputNode
         _ = engine.mainMixerNode
         let input = engine.inputNode
-        try input.setVoiceProcessingEnabled(true)
-        // Voice processing would otherwise turn other sound on the Mac down.
-        input.voiceProcessingOtherAudioDuckingConfiguration =
-            AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+        try input.setVoiceProcessingEnabled(processing)
+        self.processing = processing
+        if let device { try input.auAudioUnit.setDeviceID(device) }
+        if processing {
+            // Voice processing would otherwise turn other sound on the Mac down.
+            input.voiceProcessingOtherAudioDuckingConfiguration =
+                AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+        }
         if player.engine == nil { engine.attach(player) }
         engine.connect(player, to: engine.mainMixerNode, format: nil)
         let feed = self.feed, wakeFeed = self.wakeFeed, meter = self.meter, energy = self.energy
@@ -167,6 +225,26 @@ final class VoiceIO {
         }
     }
 
+    /// The microphone choice the engine was last started for.
+    private var microphone = Microphone.system
+    /// Whether the engine runs with the Mac's voice processing.
+    private var processing = true
+    /// The name of the input in use, for the log.
+    private(set) var microphoneName = "the Mac's choice"
+
+    /// Starts a fresh engine when the owner chose another microphone.
+    func followMicrophoneChoice() {
+        guard running, ConciergeSettings.load().microphone != microphone else { return }
+        log.notice("another microphone was chosen: starting the engine again")
+        freshEngine()
+        do {
+            try startEngine()
+            setProcessing()
+        } catch {
+            log.error("engine did not start again: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     private func stopEngine() {
         guard running else { return }
         engine.inputNode.removeTap(onBus: 0)
@@ -183,6 +261,7 @@ final class VoiceIO {
         running = false
         do {
             try startEngine()
+            setProcessing()
         } catch {
             log.error("engine did not start again: \(error.localizedDescription, privacy: .public)")
         }

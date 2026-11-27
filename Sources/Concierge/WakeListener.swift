@@ -50,6 +50,7 @@ final class WakeListener {
                 let s = ConciergeSettings.load()
                 let on = s.wakeWord && !s.isSilenced()
                 keepEngine(on)
+                if !conversation.isActive { io.followMicrophoneChoice() }
                 follow(s)
                 let wanted = on && holding && !conversation.isActive
                 if wanted && !listening { begin() }
@@ -88,6 +89,8 @@ final class WakeListener {
 
     /// Holds the audio engine while the wake word is on, and lets go when it is off.
     private func keepEngine(_ on: Bool) {
+        // An engine that failed to start again (after a device change, say) is asked again.
+        if on, holding, !io.isRunning { holding = false }
         if on, !holding, Date() >= nextTry {
             do {
                 try io.hold(.wake)
@@ -181,7 +184,26 @@ final class WakeListener {
             lastLevelLine = Date()
             let heard = io.takeMeter()
             let db = heard.peak > 0 ? 20 * log10(heard.peak) : -120
+            noteSilence(heard.buffers > 0 && heard.peak == 0)
             log.debug("wake: loudest \(Int(db), privacy: .public) dBFS in \(heard.buffers, privacy: .public) buffers, the last 5 s")
+        }
+    }
+
+    /// How many 5-second looks in a row found a microphone that sends nothing at all.
+    private var silentLooks = 0
+
+    /// A microphone that sends pure silence is not a quiet room: it is a
+    /// headset that is switched off or muted while still being the Mac's
+    /// input. Nestor then hears nothing, so say so once in the kept log.
+    private func noteSilence(_ silent: Bool) {
+        if silent {
+            silentLooks += 1
+            if silentLooks == 12 {
+                log.notice("wake: \(self.io.microphoneName, privacy: .public) has sent only silence for a minute; \(Brand.name, privacy: .public) cannot hear")
+            }
+        } else {
+            if silentLooks >= 12 { log.notice("wake: \(self.io.microphoneName, privacy: .public) sends sound again") }
+            silentLooks = 0
         }
     }
 
