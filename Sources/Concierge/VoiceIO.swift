@@ -58,6 +58,12 @@ final class VoiceIO {
     private let wakeFeed = Feed()
     /// Microphone buffers and the loudest sample since last asked, for the wake listener's log.
     private let meter = Locked<(buffers: Int, peak: Float)>((0, 0))
+    /// The energy of the microphone's sound during a turn, for its log.
+    private let energy = Locked<(sum: Double, frames: Int)>((0, 0))
+    private var lastTurnLine = Date()
+    /// The whole turn so far: microphone buffers and its loudest sample, in dBFS.
+    private var turnBuffers = 0
+    private var turnLoudest = -120
     /// Counts turns, so a late answer from a cancelled turn is ignored.
     private var turnNumber = 0
     /// How loud the sentence being said is, step by step, and when it began.
@@ -133,7 +139,7 @@ final class VoiceIO {
             AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
         if player.engine == nil { engine.attach(player) }
         engine.connect(player, to: engine.mainMixerNode, format: nil)
-        let feed = self.feed, wakeFeed = self.wakeFeed, meter = self.meter
+        let feed = self.feed, wakeFeed = self.wakeFeed, meter = self.meter, energy = self.energy
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
             let mono = Self.firstChannel(of: buffer)
@@ -141,6 +147,8 @@ final class VoiceIO {
             wakeFeed.append(mono)
             let peak = Self.peak(of: mono)
             meter.withLock { $0 = ($0.buffers + 1, max($0.peak, peak)) }
+            let sum = Self.sumOfSquares(of: mono)
+            energy.withLock { $0 = ($0.sum + sum, $0.frames + Int(mono.frameLength)) }
         }
         engine.prepare()
         try engine.start()
@@ -164,7 +172,7 @@ final class VoiceIO {
 
     private func restartAfterDeviceChange() {
         guard running else { return }
-        log.info("the sound devices changed: starting the engine again")
+        log.notice("the sound devices changed: starting the engine again")
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         running = false
@@ -204,6 +212,32 @@ final class VoiceIO {
         return m
     }
 
+    nonisolated static func sumOfSquares(of buffer: AVAudioPCMBuffer) -> Double {
+        guard let data = buffer.floatChannelData?[0] else { return 0 }
+        var sum = 0.0
+        for i in 0..<Int(buffer.frameLength) { sum += Double(data[i] * data[i]) }
+        return sum
+    }
+
+    /// The microphone since the last call: buffers, loudest sample and
+    /// average level, in dBFS. Also adds them to the turn's totals.
+    private func turnLine() -> String {
+        let got = takeMeter()
+        let e = energy.withLock { e in defer { e = (0, 0) }; return e }
+        let peak = got.peak > 0 ? Int(20 * log10(got.peak)) : -120
+        let mean = e.frames > 0 && e.sum > 0 ? Int(10 * log10(e.sum / Double(e.frames))) : -120
+        turnBuffers += got.buffers
+        turnLoudest = max(turnLoudest, peak)
+        return "\(got.buffers) buffers, loudest \(peak) dBFS, average \(mean) dBFS"
+    }
+
+    /// The turn in numbers, for the log: how long, and what the microphone gave.
+    private func turnSummary() -> String {
+        _ = turnLine()
+        let seconds = String(format: "%.1f", Date().timeIntervalSince(turnStarted))
+        return "\(seconds) s, \(turnBuffers) microphone buffers, loudest \(turnLoudest) dBFS"
+    }
+
     // MARK: Speaking
 
     /// Says `text`. When `interruptible`, it listens at the same time and
@@ -225,18 +259,18 @@ final class VoiceIO {
         speakingSince = Date()
         defer { speakingSince = nil }
         player.play()
-        log.info("say: \(buffers.count) buffers, interruptible \(interruptible)")
+        log.notice("say: \(buffers.count, privacy: .public) buffers, interruptible \(interruptible, privacy: .public)")
         if interruptible { beginTurn() }
         while !played.isSet {
             try? await Task.sleep(for: .milliseconds(100))
             if Task.isCancelled { player.stop(); endTurn(); return .finished }
             if interruptible, Self.isBargeIn(heard: heard, speaking: text) {
-                log.info("say: interrupted by \(self.heard, privacy: .private)")
+                log.notice("say: interrupted after \(Self.words(self.heard).count, privacy: .public) words")
                 player.stop()
                 return .interrupted
             }
         }
-        log.info("say: finished, heard meanwhile \(self.heard, privacy: .private)")
+        log.notice("say: finished, heard meanwhile \(Self.words(self.heard).count, privacy: .public) words")
         if interruptible { endTurn() }
         return .finished
     }
@@ -336,9 +370,13 @@ final class VoiceIO {
             try? await Task.sleep(for: .milliseconds(200))
             if Task.isCancelled { endTurn(); return nil }
             let quiet = Date().timeIntervalSince(lastChange)
+            if Date().timeIntervalSince(lastTurnLine) >= 1 {
+                lastTurnLine = Date()
+                log.debug("listen: \(self.turnLine(), privacy: .public), \(Self.words(self.heard).count, privacy: .public) words so far")
+            }
             if heard.isEmpty {
                 if Date().timeIntervalSince(waitingSince) > waitForSpeech {
-                    log.info("listen: nothing heard")
+                    log.notice("listen: nothing heard in \(self.turnSummary(), privacy: .public)")
                     endTurn()
                     return nil
                 }
@@ -348,13 +386,14 @@ final class VoiceIO {
                 // silence of its own choosing. How long to wait for speech
                 // is decided here, so listen on with a fresh turn.
                 if turnOver {
-                    log.info("listen: the recogniser gave up early, listening again")
+                    log.notice("listen: the recogniser gave up early, listening again")
                     beginTurn()
                 }
                 continue
             }
             if !heard.isEmpty, quiet > endOfTurnPause || turnOver {
                 let words = heard
+                log.notice("listen: heard \(Self.words(words).count, privacy: .public) words in \(self.turnSummary(), privacy: .public)")
                 endTurn()
                 return words
             }
@@ -368,6 +407,10 @@ final class VoiceIO {
         request.requiresOnDeviceRecognition = onDevice
         request.addsPunctuation = true
         heard = ""
+        _ = turnLine()
+        turnBuffers = 0
+        turnLoudest = -120
+        lastTurnLine = Date()
         turnStarted = Date()
         lastChange = Date()
         turnOver = false
@@ -380,7 +423,7 @@ final class VoiceIO {
             Task { @MainActor in
                 // Ending a turn cancels its task, whose error arrives after the next turn began.
                 guard let self, turn == self.turnNumber else { return }
-                if let error { log.info("recognition error: \(error.localizedDescription, privacy: .public)") }
+                if let error { log.notice("recognition error: \(error.localizedDescription, privacy: .public)") }
                 self.receive(text, final: final)
             }
         }

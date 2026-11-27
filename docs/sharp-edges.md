@@ -107,3 +107,16 @@ Traps and non-obvious constraints, one bullet each.
 - **A `.task` on a view that draws nothing never runs.** A row whose first
   state was `EmptyView` never asked for its state, so the button never
   showed. Put the task on a parent that is on screen.
+- **A conversation that hears nothing: read its record first.** Since
+  2026-11-27 each conversation leaves a few lines in the system log, with
+  numbers and kinds only, never the words: how it started, each thing said,
+  each listening turn with its length and the loudest microphone level, the
+  thinking time, the end. Read them with `log show --last 1h --style compact
+  --predicate 'subsystem == "local.jeffdekerj.concierge"'`. A turn that ends
+  "nothing heard" at about -55 dBFS was a silent room; one at -15 dBFS or
+  louder had sound the recogniser made no words of. The wake word's own
+  lines stay out of the stored log, as before.
+- **Sound-system errors at the start of a conversation mean nothing.** "failed
+  to run downlink DSP (state fault)" and "failed to write uplink microphone
+  input signal" appear when echo cancellation is switched on or off, in
+  conversations that work as in ones that do not.

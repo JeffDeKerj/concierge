@@ -1,6 +1,11 @@
 import AppKit
 import AVFoundation
 import Observation
+import OSLog
+
+/// Kept in the system log so a conversation that went wrong can be read
+/// afterwards. Numbers and kinds only: never the words.
+private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "talk")
 
 /// A spoken back-and-forth with Concierge: it listens, asks the question box,
 /// says the answer, and listens again, until the owner stops or goes quiet.
@@ -79,9 +84,11 @@ final class Conversation {
         defer {
             io.endConversation()
             state = .idle
+            log.notice("ended")
         }
         var settings = ConciergeSettings.load()
         var language = settings.spokenLanguage(frenchOnThisMac: Language.french.isOnThisMac)
+        log.notice("started in \(language.rawValue, privacy: .public): opening \(opening != nil, privacy: .public), greeting \(greet, privacy: .public), question with the name \(firstQuestion != nil, privacy: .public)")
         do {
             try await VoiceIO.authorise()
             try io.hold(.talk)
@@ -117,6 +124,7 @@ final class Conversation {
                     language = wanted
                     ConciergeSettings.update { $0.language = wanted.rawValue }
                     settings = ConciergeSettings.load()
+                    log.notice("turn \(turn, privacy: .public): switched to \(wanted.rawValue, privacy: .public)")
                     await speak(wanted.switched, settings, in: wanted)
                 } catch {
                     await speak(Language.frenchMissing, settings, in: .english)
@@ -125,10 +133,12 @@ final class Conversation {
             }
             switch Self.windowCommand(said) {
             case .show:
+                log.notice("turn \(turn, privacy: .public): asked to show the window")
                 Self.showWindow()
                 await speak(language.hereIAm, settings, in: language)
                 continue
             case .hide:
+                log.notice("turn \(turn, privacy: .public): asked to hide the window")
                 NSApp.hide(nil)
                 await sayAndEnd(language.okay, settings, in: language)
                 return
@@ -136,11 +146,14 @@ final class Conversation {
                 break
             }
             if Self.isGoodbye(said) {
+                log.notice("turn \(turn, privacy: .public): a goodbye")
                 await sayAndEnd(language.okay, settings, in: language)
                 return
             }
             state = .thinking
+            let asked = Date()
             let reply = await model.ask(heard, prompt: Self.spokenPrompt(heard, context: context, language: language))
+            log.notice("turn \(turn, privacy: .public): \(reply == nil ? "no answer" : "an answer", privacy: .public) after \(Int(Date().timeIntervalSince(asked)), privacy: .public) s of thinking")
             context = nil
             guard !Task.isCancelled else { return }
             await speak(reply ?? language.noAnswer, settings, in: language)
