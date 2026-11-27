@@ -113,6 +113,39 @@ class PageReady(unittest.TestCase):
             self.assertIsNone(tick.morning_notice(settings(), first, page, dt.datetime.now()))
 
 
+class Signin(unittest.TestCase):
+    ENDS = {"loggedIn": True, "loginExpiresAt": "2026-12-23T21:48:45.684Z"}  # earliest: 20 December
+
+    def on(self, month, day):
+        return tick.signin_warning(self.ENDS, dt.datetime(2026, month, day, 9, 0))
+
+    def test_quiet_until_ten_days_before_the_earliest_end(self):
+        self.assertIsNone(self.on(11, 27))
+        self.assertIsNone(self.on(12, 9))
+        self.assertIsNone(self.on(12, 11))
+
+    def test_warns_ten_five_two_and_one_days_before(self):
+        self.assertIn("in 10 days at the earliest, on Sunday 20 December", self.on(12, 10))
+        self.assertIn("in 5 days", self.on(12, 15))
+        self.assertIn("in 2 days", self.on(12, 18))
+        self.assertIn("tomorrow at the earliest", self.on(12, 19))
+        self.assertIsNone(self.on(12, 16))
+
+    def test_warns_every_day_once_it_may_have_ended(self):
+        self.assertIn("any day now", self.on(12, 20))
+        self.assertIn("any day now", self.on(12, 22))
+
+    def test_signed_out_is_said_and_no_answer_is_not(self):
+        self.assertIn("signed out", tick.signin_warning({"loggedIn": False}, NOON))
+        self.assertIsNone(tick.signin_warning({}, NOON))
+        self.assertIsNone(tick.signin_warning({"loggedIn": True}, NOON))
+
+    def test_the_entry_shows_on_the_page_and_notifies(self):
+        entry = tick.signin_entry("text", NOON)
+        self.assertEqual((entry["time"], entry["key"], entry["notify"], entry["tag"]),
+                         ("12:00", "topic:claude-sign-in", True, "HIGH"))
+
+
 class Spoken(unittest.TestCase):
     def test_one_entry(self):
         self.assertEqual(tick.spoken([{"title": "MIT group · Stephane asks", "text": "About assays."}]),

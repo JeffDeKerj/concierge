@@ -68,6 +68,15 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   and `RunLog.Entry.sessionCostUSD` keep the running total the CLI reports;
   the entry's `costUSD` and the cost line show the difference from the last
   run of the same session.
+- **Sign-in watch** (`check_signin` in `tick.py`). Once a day, from the hour
+  the checks start, the job runner reads `claude auth status`. The mail,
+  calendar and Slack connectors need that sign-in, and it has an end date
+  (`loginExpiresAt`, which the tool says may come up to three days sooner).
+  The owner is told 10, 5, 2 and 1 days before the earliest day, then every
+  day, and at once when signed out: an entry in today's updates with the
+  key `topic:claude-sign-in`, so it shows on the page, as a notification,
+  on the phone and aloud. On 2026-11-27 the sign-in ran to 20 to 23
+  December 2026.
 - **The page is not trusted** (`PageGuard.swift`). It is written by a model
   that has just read mail and chats, so the app adds a rule as the first
   thing in its head (`Content-Security-Policy: default-src 'none'`, with

@@ -203,6 +203,60 @@ def morning_notice(s: dict, state: dict, page: Path, now: dt.datetime) -> str | 
     return None
 
 
+def signin_warning(status: dict, now: dt.datetime) -> str | None:
+    """What to tell the owner about the Claude sign-in, or None. The connectors for
+    mail, calendar and Slack need the `claude auth login` sign-in, which has an end
+    date; the tool gives the latest day and says it may end up to three days sooner.
+    Said 10, 5, 2 and 1 days before the earliest day, then every day. Pure, for tests."""
+    if not status:
+        return None  # the tool could not be asked: say nothing rather than guess
+    if not status.get("loggedIn"):
+        return ("Nestor is signed out of Claude, so no page or check can run. "
+                "Run claude auth login in a terminal.")
+    try:
+        latest = dt.datetime.fromisoformat(str(status["loginExpiresAt"]).replace("Z", "+00:00"))
+    except (KeyError, ValueError):
+        return None
+    earliest = (latest.astimezone() - dt.timedelta(days=3)).date()
+    days = (earliest - now.date()).days
+    if days > 10 or (days > 0 and days not in (10, 5, 2, 1)):
+        return None
+    when = ("any day now" if days <= 0 else "tomorrow at the earliest" if days == 1
+            else f"in {days} days at the earliest, on {earliest.strftime('%A')} {earliest.day} {earliest.strftime('%B')}")
+    return (f"Nestor's Claude sign-in ends {when}. Run claude auth login in a terminal before then, "
+            "or the morning page and the checks stop.")
+
+
+def signin_entry(text: str, now: dt.datetime) -> dict:
+    """The warning as an entry of today's updates, shown on the page and notified."""
+    return {"time": now.strftime("%H:%M"), "kind": "check", "tag": "HIGH", "title": "Claude sign-in",
+            "text": text, "key": "topic:claude-sign-in", "notify": True}
+
+
+def check_signin(s: dict, state: dict, now: dt.datetime, updates_path: Path, agenda: list) -> None:
+    """Once a day, from the hour the checks start: ask the tool about the sign-in
+    and warn the owner when it is about to end."""
+    today = now.date().isoformat()
+    if state.get("signinChecked") == today or now.time() < hm(s["checkFrom"]):
+        return
+    state["signinChecked"] = today
+    try:
+        out = subprocess.run([CLAUDE, "auth", "status"], capture_output=True, text=True, timeout=60)
+        status = json.loads(out.stdout or "{}")
+    except (subprocess.SubprocessError, ValueError, OSError):
+        status = {}
+    text = signin_warning(status, now)
+    if not text:
+        return
+    entries = read_json(updates_path, [])
+    if any(e.get("key") == "topic:claude-sign-in" for e in entries):
+        return
+    entry = signin_entry(text, now)
+    updates_path.parent.mkdir(exist_ok=True)
+    updates_path.write_text(json.dumps(entries + [entry], indent=1))
+    notify(s, [entry], now, agenda)
+
+
 def notify(s: dict, entries: list, now: dt.datetime | None = None, agenda: list | None = None,
            speaker=None) -> None:
     entries = [e for e in entries if e.get("notify")]
@@ -238,6 +292,9 @@ def main() -> int:
     agenda = read_json(B / "agenda" / f"{today}.json", [])
     updates_path = B / "updates" / f"{today}.json"
     page = B / f"{today}.html"
+    if s.get("pausedOn") != today:
+        check_signin(s, state, now, updates_path, agenda)
+        state_path.write_text(json.dumps(state, indent=1))
     for kind, prompt, model in due_jobs(s, state, now, agenda, page_done(page, now)):
         before = len(read_json(updates_path, []))
         run(kind, prompt, model)
