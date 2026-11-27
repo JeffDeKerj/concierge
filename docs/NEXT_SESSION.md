@@ -1,9 +1,9 @@
 # NEXT_SESSION
 
-Main tip `be43169` (code; this doc lands just after). **Concierge has a
+Main tip `59b0993` (code; this doc lands just after). **Concierge has a
 face and a name: Nestor.** The owner sees and says "Nestor" everywhere (window,
 menu bar, notifications, wake word); the code, the app file and this
-repository keep the working name Concierge. An owl in a concierge's hat rests in the top bar next to the date,
+repository keep the working name Concierge. An owl in a concierge's hat rests in the top bar next to the name,
 blinking and looking about; it sleeps while Concierge is silenced. A click on
 it, Cmd-T or saying "Nestor" starts a conversation: the owl glides to the middle
 of the window and grows, shows the words it hears, moves its beak with the
@@ -14,7 +14,9 @@ and the wake listener keeps nothing in the system log. Since 2026-11-27 Nestor
 also listens and speaks in French, on the Mac: "Nestor, speak French" and
 "Nestor, parle anglais" switch, and Settings › Voice downloads French
 recognition itself. The morning page also has a "Keymodule on Slack"
-section, and the top bar shows the day under the name. Session logs:
+section, and the top bar shows the day under the name. Nestor keeps a
+short record of each conversation in the system log, numbers only, to read
+when it fails to hear (see Sharp edges). Session logs:
 [2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md),
 [2026-11-27](sessions/2026-11-27.md).
 
