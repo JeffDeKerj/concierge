@@ -2,7 +2,10 @@ import Foundation
 import Testing
 @testable import Concierge
 
-struct BackendTests {
+/// `modelChoiceIsSavedPerBackend` writes the saved model choices, which the
+/// app-model suites reset, so this suite runs one at a time with them.
+extension SerialTests {
+@Suite struct BackendTests {
     @Test func claudeReadsCostTokensModelAndDenials() {
         let json = """
         {"type":"result","is_error":false,"duration_ms":192000,"num_turns":41,"result":"Written.","session_id":"abc",
@@ -108,4 +111,5 @@ struct BackendTests {
         #expect(RunReport.count(530012) == "530k")
         #expect(RunReport().summary == "")
     }
+}
 }
