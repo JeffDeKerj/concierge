@@ -1,6 +1,6 @@
 # NEXT_SESSION
 
-Main tip `bc87f51` (code; this doc lands just after). **Concierge has a
+Main tip `4256a64` (code; this doc lands just after). **Concierge has a
 face and a name: Nestor.** The owner sees and says "Nestor" everywhere (window,
 menu bar, notifications, wake word); the code, the app file and this
 repository keep the working name Concierge. An owl in a concierge's hat rests in the top bar next to the date,
@@ -10,8 +10,12 @@ of the window and grows, shows the words it hears, moves its beak with the
 voice, and glides back at the end. When the window is out of sight it appears
 in a corner of the screen. The owner chose it from nine styles, all still in
 Settings. Also new: "Nestor, show your face" and "hide" move the window,
-and the wake listener keeps nothing in the system log. Session logs:
-[2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md).
+and the wake listener keeps nothing in the system log. Since 2026-11-27 Nestor
+also listens and speaks in French, on the Mac: "Nestor, speak French" and
+"Nestor, parle anglais" switch, and Settings › Voice downloads French
+recognition itself. Session logs:
+[2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md),
+[2026-11-27](sessions/2026-11-27.md).
 
 Reference: [What's stable](stable.md) · [Sharp edges](sharp-edges.md) · [Tried](tried.md).
 
