@@ -86,6 +86,33 @@ class Morning(unittest.TestCase):
             self.assertTrue(tick.page_done(page, at + dt.timedelta(hours=1)))
 
 
+class PageReady(unittest.TestCase):
+    PAGE = ("<section><h2>Urgent actions</h2><ul><li data-key='a'>x</li><li data-key='b'>y</li></ul></section>"
+            "<section><h2>Agenda</h2><ul><li class='row'>z</li></ul></section>")
+
+    def test_counts_the_urgent_items_only(self):
+        self.assertEqual(tick.page_ready_text(self.PAGE), "Morning page ready · 2 urgent items")
+        self.assertEqual(tick.page_ready_text(self.PAGE.replace("<li data-key='b'>y</li>", "")),
+                         "Morning page ready · 1 urgent item")
+        self.assertEqual(tick.page_ready_text("<h2>Agenda</h2><ul><li>z</li></ul>"),
+                         "Morning page ready · nothing urgent")
+
+    def test_the_phone_hears_of_a_page_or_of_the_last_failed_try(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            page = Path(folder) / "2026-11-26.html"
+            first = {"morning": {"day": "2026-11-26", "count": 1, "last": "2026-11-26T07:20:00"}}
+            last = {"morning": {"day": "2026-11-26", "count": 3, "last": "2026-11-26T08:20:00"}}
+            # No page and tries left: say nothing yet.
+            self.assertIsNone(tick.morning_notice(settings(), first, page, SEVEN))
+            self.assertIn("could not be built", tick.morning_notice(settings(), last, page, SEVEN))
+            page.write_text(self.PAGE)
+            self.assertEqual(tick.morning_notice(settings(), first, page, SEVEN), "Morning page ready · 2 urgent items")
+            # A page still being written is not ready.
+            page.write_text(self.PAGE + "<!-- S:low -->")
+            self.assertIsNone(tick.morning_notice(settings(), first, page, dt.datetime.now()))
+
+
 class Spoken(unittest.TestCase):
     def test_one_entry(self):
         self.assertEqual(tick.spoken([{"title": "MIT group · Stephane asks", "text": "About assays."}]),

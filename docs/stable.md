@@ -141,5 +141,7 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   A failed build is tried again after 30 minutes, three times a day at
   most. A page left half-written (it still holds `<!-- S:` markers and has
   not changed for ten minutes) counts as missing. Each build is a `morning`
-  line in `runs.jsonl`. The Claude desktop task `morning-briefing` that did
+  line in `runs.jsonl`. When the page is written the phone gets "Morning
+  page ready · 2 urgent items" through ntfy (`morning_notice`), or after
+  the last failed try that there is no page today. The Claude desktop task `morning-briefing` that did
   this before is switched off, not deleted.

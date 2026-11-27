@@ -9,7 +9,8 @@ Jobs, each a Claude Code skill run headless in the project folder:
   concierge-wrapup  the evening summary
 Each run is logged to briefings/runs.jsonl like the app's own runs, and new
 entries in briefings/updates/<day>.json marked "notify" become a Mac
-notification and an ntfy message.
+notification and an ntfy message. The phone is also told when the morning
+page is ready, or that it could not be built.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ import datetime as dt
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
@@ -174,6 +176,33 @@ def say(s: dict, text: str) -> None:
     subprocess.run(cmd, capture_output=True, timeout=120)
 
 
+def push(title: str) -> None:
+    """One line to the phone, through ntfy on spark. Lost while spark is off."""
+    try:
+        req = urllib.request.Request(NTFY, data=title.encode(), headers={"Title": NAME})
+        urllib.request.urlopen(req, timeout=10)
+    except OSError:
+        pass
+
+
+def page_ready_text(html: str) -> str:
+    """What the phone is told when the morning page is written. Pure, for tests."""
+    urgent = re.search(r"<h2[^>]*>\s*Urgent actions\s*</h2>(.*?)(?:</section>|<h2)", html, re.S | re.I)
+    count = len(re.findall(r"<li\b", urgent.group(1))) if urgent else 0
+    what = "nothing urgent" if count == 0 else "1 urgent item" if count == 1 else f"{count} urgent items"
+    return f"Morning page ready · {what}"
+
+
+def morning_notice(s: dict, state: dict, page: Path, now: dt.datetime) -> str | None:
+    """What to tell the phone after a morning build: the page is ready, or, after
+    the last try, that there is none today. Nothing while tries are left."""
+    if page_done(page, now) and "<!-- S:" not in page.read_text(errors="replace"):
+        return page_ready_text(page.read_text(errors="replace"))
+    if (state.get("morning") or {}).get("count", 0) >= s["morningTries"]:
+        return "The morning page could not be built today. Press Refresh to try again."
+    return None
+
+
 def notify(s: dict, entries: list, now: dt.datetime | None = None, agenda: list | None = None,
            speaker=None) -> None:
     entries = [e for e in entries if e.get("notify")]
@@ -183,11 +212,7 @@ def notify(s: dict, entries: list, now: dt.datetime | None = None, agenda: list 
             script = f"display notification {json.dumps(title)} with title {json.dumps(NAME)}"
             subprocess.run(["osascript", "-e", script], capture_output=True)
         if s["notifyPhone"]:
-            try:
-                req = urllib.request.Request(NTFY, data=title.encode(), headers={"Title": NAME})
-                urllib.request.urlopen(req, timeout=10)
-            except OSError:
-                pass
+            push(title)
     # Spoken last: the banners show at once, the voice takes a few seconds.
     if entries and may_speak(s, now or dt.datetime.now(), agenda or []):
         try:
@@ -220,6 +245,9 @@ def main() -> int:
             tries = state.get("morning") or {}
             count = tries.get("count", 0) + 1 if tries.get("day") == today else 1
             state["morning"] = {"day": today, "count": count, "last": now.isoformat()}
+            notice = morning_notice(s, state, page, dt.datetime.now())
+            if notice and s["notifyPhone"]:
+                push(notice)
         elif kind == "check":
             state["lastCheck"] = now.isoformat()
         elif kind == "prep":
