@@ -8,6 +8,29 @@ struct DismissStoreTests {
         return DismissStore(url: dir.appendingPathComponent("dismissed.json"))
     }
 
+    @Test func anItemThePageBroughtBackIsShownAgain() throws {
+        let store = temporaryStore()
+        let written = Date()
+        let before = written.addingTimeInterval(-3600)
+        store.add(DismissedItem(key: "mail:1", title: "Back with news", source: nil, section: nil, dismissedAt: before))
+        store.add(DismissedItem(key: "mail:2", title: "Still dismissed", source: nil, section: nil, dismissedAt: before))
+        store.add(DismissedItem(key: "mail:3", title: "Dismissed again on this page", source: nil, section: nil,
+                                dismissedAt: written.addingTimeInterval(60)))
+        let kept = store.clearReturned(keys: ["mail:1", "mail:3", "mail:9"], pageWritten: written)
+        #expect(kept.map(\.key) == ["mail:2", "mail:3"])
+        #expect(store.load().map(\.key) == ["mail:2", "mail:3"])
+    }
+
+    @Test func thePageSaysWhichItemsCameBack() {
+        let page = """
+        <ul><li data-key="mail:1" data-returned="new"><span class="tag">New</span>x</li>
+        <li data-returned='back' data-key='whatsapp:66:2026-11-26T07:11'>y</li>
+        <li data-key="mail:2">z</li><li data-returned="new">no key</li></ul>
+        """
+        #expect(PageGuard.returnedKeys(in: page) == ["mail:1", "whatsapp:66:2026-11-26T07:11"])
+        #expect(PageGuard.returnedKeys(in: "<li data-key=\"mail:2\">z</li>").isEmpty)
+    }
+
     @Test func addsReplacesRemovesAndClears() throws {
         let store = temporaryStore()
         #expect(store.load().isEmpty)

@@ -84,6 +84,16 @@ enum PageGuard {
         return lines
     }
 
+    /// The keys of items the skill listed again although they were dismissed,
+    /// because something new happened: `<li data-key="…" data-returned="new">`.
+    static func returnedKeys(in html: String) -> Set<String> {
+        var keys: Set<String> = []
+        for attributes in matches("<li\\b([^>]*\\bdata-returned\\b[^>]*)>", in: html) {
+            if let key = matches("\\bdata-key\\s*=\\s*[\"']([^\"']+)[\"']", in: attributes).first { keys.insert(key) }
+        }
+        return keys
+    }
+
     /// The page cut at its headings: each title in lower case with what follows it.
     private static func sections(of html: String) -> [(title: String, body: String)] {
         guard let heading = try? NSRegularExpression(pattern: "<h[12][^>]*>([\\s\\S]*?)</h[12]>", options: .caseInsensitive) else { return [] }

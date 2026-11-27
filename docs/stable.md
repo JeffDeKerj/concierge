@@ -56,7 +56,14 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   dismissedAt). Each section shows "n dismissed · Show" to reveal and restore
   ("↩") them; View > Forget Dismissed Items empties the file. The briefing
   skill reads the file and leaves those items off the next page unless the
-  source moved since. Keys are the page's `data-key`, else the Gmail thread
+  source moved since. Then the skill lists it again, tagged NEW, with
+  `data-returned` on its `<li>`; the app forgets a dismissal that is older
+  than such a page (`DismissStore.clearReturned`), so the item shows. A
+  dismissal made after the page was written stands. Checked on 2026-11-27
+  against the first four days of pages: keys were stable, but a page
+  rebuilt on the 26th listed two items dismissed earlier that day with no
+  news; the app hid them, and the skill now checks its page against the
+  file before it finishes. Keys are the page's `data-key`, else the Gmail thread
   id in the item's link, else the item's own words.
 - **Model per operation** (`ModelSettings`): the Agent menu has "Model for
   Refresh" and "Model for Questions", one list per backend, saved in

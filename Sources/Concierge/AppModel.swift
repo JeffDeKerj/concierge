@@ -114,7 +114,13 @@ final class AppModel {
             notice = "No briefing yet. Press Refresh to build today's."
         }
         loadLastUpdated()
-        pageProblems = picked.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) }.map(PageGuard.problems(in:)) ?? []
+        let html = picked.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) }
+        pageProblems = html.map(PageGuard.problems(in:)) ?? []
+        // An item the page brought back with news is shown again.
+        if let html, let written = picked?.modificationDate {
+            let returned = PageGuard.returnedKeys(in: html)
+            if !returned.isEmpty { dismissed = dismissStore.clearReturned(keys: returned, pageWritten: written) }
+        }
     }
 
     private func loadLastUpdated() {

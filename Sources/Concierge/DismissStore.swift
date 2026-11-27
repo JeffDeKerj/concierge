@@ -95,6 +95,19 @@ struct DismissStore {
         } else { try? data.write(to: history) }
     }
 
+    /// Forgets the dismissal of items a later page brought back. The skill
+    /// lists a dismissed item again only when its source moved (a new message
+    /// in the thread), and marks it; the app would otherwise still hide it.
+    /// A dismissal made after the page was written stands: that is the owner
+    /// dismissing the item again.
+    @discardableResult
+    func clearReturned(keys: Set<String>, pageWritten: Date) -> [DismissedItem] {
+        let all = load()
+        let kept = all.filter { !(keys.contains($0.key) && $0.dismissedAt < pageWritten) }
+        if kept.count != all.count { save(kept) }
+        return kept
+    }
+
     /// Drops snoozes whose time has passed, so those items show again.
     @discardableResult
     func removeExpired(now: Date = Date()) -> [DismissedItem] {
