@@ -1,6 +1,6 @@
 # NEXT_SESSION
 
-Main tip `4256a64` (code; this doc lands just after). **Concierge has a
+Main tip `be43169` (code; this doc lands just after). **Concierge has a
 face and a name: Nestor.** The owner sees and says "Nestor" everywhere (window,
 menu bar, notifications, wake word); the code, the app file and this
 repository keep the working name Concierge. An owl in a concierge's hat rests in the top bar next to the date,
