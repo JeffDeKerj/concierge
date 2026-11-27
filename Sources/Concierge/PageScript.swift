@@ -14,7 +14,8 @@ enum PageScript {
     /// Sections whose top-level list items can be dismissed. Matched on the
     /// section's h2 text, lower-cased.
     static let dismissableSections = [
-        "urgent actions", "other conversations", "already handled or low priority", "papers to read",
+        "urgent actions", "keymodule on slack", "other conversations",
+        "already handled or low priority", "papers to read",
     ]
 
     /// Runs once the document is loaded. Defines `window.briefing.applyDismissed(keys)`

@@ -48,6 +48,7 @@ struct DismissStoreTests {
 
     @Test func scriptEmbedsSectionsAndKeys() {
         #expect(PageScript.source.contains("\"urgent actions\""))
+        #expect(PageScript.source.contains("\"keymodule on slack\""))
         #expect(PageScript.applyCall(keys: ["mail:1", "it's"]) == "window.briefing && window.briefing.applyDismissed([\"mail:1\",\"it's\"]);")
         #expect(PageScript.jsArray(["a\"b"]) == "[\"a\\\"b\"]")
     }

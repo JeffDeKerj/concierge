@@ -48,12 +48,6 @@ struct ContentView: View {
         .overlay { StagedFace() }
         .toolbar {
             ToolbarItem(placement: .primaryAction) { SilenceButton() }
-            ToolbarItem(placement: .navigation) {
-                if let page = model.page {
-                    Text(page.longDay)
-                        .foregroundStyle(.secondary)
-                }
-            }
             ToolbarItem(placement: .navigation) { FaceButton() }
             ToolbarItem(placement: .primaryAction) {
                 if model.isRefreshing {
@@ -83,6 +77,8 @@ struct ContentView: View {
                 }
             }
         }
+        // The day sits under the name, where the top bar has room for it.
+        .navigationSubtitle(model.page?.longDay ?? "")
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The scheduled task may have written a new page while the app sat
             // in the background, or overnight.

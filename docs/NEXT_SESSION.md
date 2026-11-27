@@ -13,7 +13,8 @@ Settings. Also new: "Nestor, show your face" and "hide" move the window,
 and the wake listener keeps nothing in the system log. Since 2026-11-27 Nestor
 also listens and speaks in French, on the Mac: "Nestor, speak French" and
 "Nestor, parle anglais" switch, and Settings › Voice downloads French
-recognition itself. Session logs:
+recognition itself. The morning page also has a "Keymodule on Slack"
+section, and the top bar shows the day under the name. Session logs:
 [2026-11-26](sessions/2026-11-26.md), [2026-11-26b](sessions/2026-11-26b.md),
 [2026-11-27](sessions/2026-11-27.md).
 

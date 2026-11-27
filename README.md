@@ -3,7 +3,7 @@
 A small macOS app that opens on the morning briefing page. The page itself is
 built by the `briefing` skill in Claude Code (`~/.claude/skills/briefing/`),
 which writes `briefings/<YYYY-MM-DD>.html` from Gmail, Google Calendar,
-WhatsApp and the Obsidian digests. A scheduled task in the Claude desktop app
+WhatsApp, the owner's work Slack and the Obsidian digests. A scheduled task in the Claude desktop app
 runs it every morning at about 07:20.
 
 The app:
@@ -43,7 +43,8 @@ others are told to read the skill file and follow it.
 
 A headless run cannot ask for permission, so `.claude/settings.json` in this
 folder pre-allows what the skill needs: the read-only Gmail and Calendar
-tools, WhatsApp, writes into `briefings/`, and the headless Chrome check. The
+tools, WhatsApp, three Slack reading tools, writes into `briefings/`, and the
+headless Chrome check. The
 CLI only honours that file once the folder is trusted: run `claude` here once
 interactively and accept the trust dialog, or set
 `projects["<this folder>"].hasTrustDialogAccepted: true` in `~/.claude.json`.

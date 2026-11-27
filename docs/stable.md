@@ -27,8 +27,10 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   prices over 60 turns and 4 minutes; a one-word call costs about $0.22
   because the folder's context is written to the cache every time.
 - **Headless permissions** (`.claude/settings.json`): pre-allows the skill's
-  read-only connector tools, WhatsApp, writes into `briefings/` and the
-  headless Chrome check. Honoured only once the folder is trusted in
+  read-only connector tools, WhatsApp, three Slack reading tools (search,
+  read a channel, read a thread), writes into `briefings/` and the
+  headless Chrome check. Slack's writing tools are denied for every run in
+  `~/.claude/settings.json`. Honoured only once the folder is trusted in
   `~/.claude.json` (`hasTrustDialogAccepted`).
 - **Refresh** (`AppModel.refresh`): the backend's refresh command with the
   project folder as working directory (`claude -p "/briefing" --output-format json`). A watcher checks the file's modification time
