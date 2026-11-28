@@ -17,8 +17,16 @@ enum CalledName {
         let heard = letters(word), wanted = letters(name)
         guard !wanted.isEmpty else { return false }
         if heard == wanted { return true }
+        if soundsLike[String(wanted)]?.contains(String(heard)) == true { return true }
         return wanted.count >= 5 && distance(heard, wanted) <= 1
     }
+
+    /// What the English recogniser writes for a name it does not know, too
+    /// far from the spelling to match by one letter. Seen on 2026-11-28:
+    /// "Nestor, Nestor, Nestor" came out as "Nestor Leicester Leicester".
+    static let soundsLike: [String: Set<String>] = [
+        "nestor": ["leicester", "lester", "nesta"],
+    ]
 
     /// The words after the name, or nil when the name was not said. The
     /// last mention counts: earlier ones were part of other talk.

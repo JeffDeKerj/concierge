@@ -26,6 +26,11 @@ struct WakeWordTests {
     @Test func theNameIsFoundHoweverTheRecogniserSpellsIt() {
         #expect(CalledName.after("Nester, show your face", name: "Nestor") == "show your face")
         #expect(CalledName.after("nest or what's on tomorrow", name: "Nestor") == "what's on tomorrow")
+        // What the recogniser wrote on 2026-11-28 for "Nestor, Nestor, Nestor".
+        #expect(CalledName.after("Leicester Leicester", name: "Nestor") == "")
+        #expect(CalledName.after("Lester, what's on tomorrow", name: "Nestor") == "what's on tomorrow")
+        // Only for this name: another name is not woken by Leicester.
+        #expect(CalledName.after("Leicester", name: "Max") == nil)
     }
 
     @Test func wordsThatOnlyLookLikeTheNameDoNotWakeIt() {
