@@ -48,6 +48,7 @@ def summary(lines: list[str]) -> dict | None:
     """The title, first question, state and last words of one session, or None when it is Nestor's own."""
     title = first = last_text = ""
     last_stop = None
+    text_asks = card_asks = False  # a question in its last words; a question card, until answered
     for line in lines:
         try:
             e = json.loads(line)
@@ -65,20 +66,37 @@ def summary(lines: list[str]) -> dict | None:
                 b.get("text", "") for b in content or [] if isinstance(b, dict) and b.get("type") == "text")
             if text.strip():
                 first = text.strip()
+        if kind == "user" and isinstance(content, str) and content.strip():
+            text_asks = card_asks = False  # the owner answered
         if kind == "assistant":
             last_stop = message.get("stop_reason") or last_stop
             for b in content or []:
-                if isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip():
+                if not isinstance(b, dict):
+                    continue
+                if b.get("type") == "text" and b.get("text", "").strip():
                     last_text = b["text"].strip()
+                    text_asks = ends_with_question(last_text)
+                if b.get("type") == "tool_use" and asks_owner(b.get("name", ""), b.get("input") or {}):
+                    card_asks = True
     if first.startswith(OWN):
         return None
-    return {"title": title or first[:80], "last_stop": last_stop, "last_text": last_text}
+    return {"title": title or first[:80], "last_stop": last_stop, "last_text": last_text, "asks": text_asks or card_asks}
 
 
-def state(last_stop: str | None, idle_seconds: float) -> str:
-    """Working, waiting for the owner, or stopped. Pure, for tests."""
-    if last_stop == "end_turn":
-        return "waiting for you"
+def ends_with_question(text: str) -> bool:
+    """Whether the last sentence is a question. Pure, for tests."""
+    return text.rstrip().rstrip("*_`\"' )").endswith("?")
+
+
+def asks_owner(tool: str, given: dict) -> bool:
+    """A question card, a plan to approve, or the app's next-step box with a question. Pure, for tests."""
+    return tool in ("AskUserQuestion", "ExitPlanMode") or (tool.endswith("wrap_up") and bool(given.get("ask")))
+
+
+def state(last_stop: str | None, idle_seconds: float, asks: bool = False) -> str:
+    """Working, asking the owner something, finished, or stopped. Pure, for tests."""
+    if last_stop == "end_turn" or (asks and idle_seconds >= WORKING_FOR):
+        return "asked you something and waits for your answer" if asks else "finished, nothing asked"
     return "working" if idle_seconds < WORKING_FOR else "stopped mid-way"
 
 
@@ -110,7 +128,7 @@ def lines_here(hours: float) -> list[str]:
         when = dt.datetime.fromtimestamp(now - idle).strftime("%H:%M")
         words = " ".join(s["last_text"].split())
         words = words[:300] + ("..." if len(words) > 300 else "")
-        out.append(f"- {project}: \"{s['title']}\", last active {when} ({ago(idle)}), {state(s['last_stop'], idle)}."
+        out.append(f"- {project}: \"{s['title']}\", last active {when} ({ago(idle)}), {state(s['last_stop'], idle, s['asks'])}."
                    + (f" Last said: {words}" if words else ""))
     return out
 

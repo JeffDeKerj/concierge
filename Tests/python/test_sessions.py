@@ -20,14 +20,35 @@ class SessionTests(unittest.TestCase):
             line(type="assistant", isSidechain=True, message={"content": [{"type": "text", "text": "helper"}]}),
             line(type="assistant", message={"stop_reason": "end_turn", "content": [{"type": "text", "text": "Done."}]}),
         ])
-        self.assertEqual(s, {"title": "Loft boxes fix", "last_stop": "end_turn", "last_text": "Done."})
+        self.assertEqual(s, {"title": "Loft boxes fix", "last_stop": "end_turn", "last_text": "Done.", "asks": False})
 
     def test_nestors_own_runs_are_left_out(self):
         self.assertIsNone(sessions.summary([line(type="user", message={"content": "(You are the owner's assistant, ..."})]))
         self.assertIsNone(sessions.summary([line(type="user", message={"content": "<command-name>/briefing</command-name>"})]))
 
+    def test_a_question_to_the_owner_is_told_apart_from_a_finished_turn(self):
+        asked = sessions.summary([
+            line(type="user", message={"content": "Merge it?"}),
+            line(type="assistant", message={"stop_reason": "end_turn", "content": [{"type": "text", "text": "Shall I push them, or leave them?"}]}),
+        ])
+        self.assertTrue(asked["asks"])
+        card = sessions.summary([
+            line(type="user", message={"content": "Go"}),
+            line(type="assistant", message={"stop_reason": "end_turn", "content": [
+                {"type": "tool_use", "name": "mcp__ccd_turn__wrap_up", "input": {"recap": "x", "ask": "Push?"}},
+                {"type": "text", "text": "Done."}]}),
+        ])
+        self.assertTrue(card["asks"])
+        answered = sessions.summary([
+            line(type="assistant", message={"stop_reason": "end_turn", "content": [{"type": "text", "text": "Which one?"}]}),
+            line(type="user", message={"content": "The first"}),
+            line(type="assistant", message={"stop_reason": "end_turn", "content": [{"type": "text", "text": "Done."}]}),
+        ])
+        self.assertFalse(answered["asks"])
+
     def test_the_state_reads_plainly(self):
-        self.assertEqual(sessions.state("end_turn", 999), "waiting for you")
+        self.assertEqual(sessions.state("end_turn", 999), "finished, nothing asked")
+        self.assertEqual(sessions.state("end_turn", 999, asks=True), "asked you something and waits for your answer")
         self.assertEqual(sessions.state("tool_use", 30), "working")
         self.assertEqual(sessions.state("tool_use", 600), "stopped mid-way")
 
