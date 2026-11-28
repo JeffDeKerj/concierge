@@ -171,7 +171,15 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   this Mac cannot recognise by itself unless Apple's servers are allowed;
   the wake listener never uses them and listens in English when French is
   not on the Mac. "Speak French" / "parle anglais" switch by voice
-  (`Language.asked`). Alerts are written and said in English.
+  (`Language.asked`), also through the listener's commas ("Speak, English")
+  and as one word ("Anglais !"). Since 2026-11-28 each sentence is read by
+  the voice of the language it is written in (`Language.of`, Apple's
+  language recogniser, 3 words and 80 % sure at least), so English never
+  gets the French voice. A whole answer of 6 words or more in the other
+  language moves the conversation's listening and setting to it
+  (`Conversation.switchTo`). An English question asked while listening in
+  French is still mangled ("what's on" came out as "store Wat"): ask for
+  English first. Alerts are written and said in English.
   `Phrases.plain` strips accents and punctuation before phrases are matched.
   `SpeechDownload.swift` fetches a language's recognition files from the
   app (`AssetInventory`, macOS 26 and later) behind the `SpeechFiles`

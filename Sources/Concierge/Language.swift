@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import Speech
 
 /// The language the assistant listens and speaks in during a conversation.
@@ -43,7 +44,9 @@ enum Language: String, CaseIterable, Identifiable {
     /// Said in the new language once it has switched.
     var switched: String { self == .french ? "D'accord, en français." : "Okay, in English." }
     /// Added to the question so the model answers in this language.
-    var answerRule: String { self == .french ? " Answer in French." : "" }
+    var answerRule: String {
+        self == .french ? " Answer in French, unless the owner asks for another language." : ""
+    }
     /// For the Test button in Settings.
     var sample: String {
         self == .french
@@ -59,15 +62,36 @@ enum Language: String, CaseIterable, Identifiable {
     /// switch back in French, because that is the language being listened
     /// for at that moment.
     static func asked(in heard: String) -> Language? {
-        let words = Phrases.plain(heard)
-        guard words.split(separator: " ").count <= 6 else { return nil }
+        // The listener puts commas where it pauses: "Speak, English".
+        let words = Phrases.plain(heard).components(separatedBy: CharacterSet.letters.union(.init(charactersIn: "'")).inverted)
+            .filter { !$0.isEmpty }.joined(separator: " ")
+        let count = words.split(separator: " ").count
+        guard count <= 6 else { return nil }
+        // One or two words alone is a request too: "Anglais !", "English please".
+        if count <= 2, ["english", "anglais", "inglish"].contains(where: { words.hasPrefix($0) }) { return .english }
+        if count <= 2, ["french", "francais"].contains(where: { words.hasPrefix($0) }) { return .french }
         let french = ["speak french", "in french", "talk french", "switch to french", "french please",
-                      "parle francais", "en francais", "parlons francais"]
+                      "speak in french", "parle francais", "en francais", "parlons francais", "parle en francais",
+                      "passe en francais", "parler francais"]
         let english = ["speak english", "in english", "talk english", "switch to english", "english please",
-                       "parle anglais", "en anglais", "parlons anglais", "anglais s'il te plait"]
+                       "speak in english", "parle anglais", "en anglais", "parlons anglais", "parle en anglais",
+                       "passe en anglais", "parler anglais", "anglais s'il te plait", "speak inglish", "in inglish"]
         if french.contains(where: { words.contains($0) }) { return .french }
         if english.contains(where: { words.contains($0) }) { return .english }
         return nil
+    }
+
+    /// The language a piece of text is written in, when it is clearly one
+    /// of the two: a voice must never read English with a French accent.
+    /// Nil for a few words or a mix, where the conversation's own language
+    /// is the better guess.
+    static func of(_ text: String) -> Language? {
+        guard text.split(separator: " ").count >= 3 else { return nil }
+        let recogniser = NLLanguageRecognizer()
+        recogniser.languageConstraints = [.english, .french]
+        recogniser.processString(text)
+        guard let (best, chance) = recogniser.languageHypotheses(withMaximum: 1).first, chance >= 0.8 else { return nil }
+        return best == .french ? .french : .english
     }
 }
 

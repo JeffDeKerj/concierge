@@ -336,7 +336,9 @@ final class VoiceIO {
     /// spoken while the rest of it is still being written. `onFirst` is
     /// called when the first one starts to sound. One listening turn covers
     /// them all, so the owner can talk over any of them.
+    /// `voiceFor`, when given, picks the voice and language for each sentence.
     func say(parts: AsyncStream<String>, voiceID: String, interruptible: Bool, in spoken: Language? = nil,
+             voiceFor: ((String) -> (id: String, language: Language))? = nil,
              onFirst: (() -> Void)? = nil) async -> Said {
         let waiting = Locked(0)
         sayingText = ""
@@ -349,7 +351,8 @@ final class VoiceIO {
             var audioEnd = Date()
             var connected: AVAudioFormat?
             for await part in parts {
-                let buffers = await self.synthesise(Speaker.utterance(part, voiceID: voiceID, language: spoken ?? self.language))
+                let voice = voiceFor?(part) ?? (id: voiceID, language: spoken ?? self.language)
+                let buffers = await self.synthesise(Speaker.utterance(part, voiceID: voice.id, language: voice.language))
                 guard !Task.isCancelled else { return }
                 guard let format = buffers.first?.format else { continue }
                 if connected != format {

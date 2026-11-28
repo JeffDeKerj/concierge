@@ -12,10 +12,21 @@ struct LanguageSwitchTests {
         #expect(Language.asked(in: "Speak English") == .english)
     }
 
+    @Test func aSwitchIsHeardThroughTheListenersCommasAndShortForms() {
+        // What the French listener wrote on 2026-11-28.
+        #expect(Language.asked(in: "Speak, English") == .english)
+        #expect(Language.asked(in: "Anglais !") == .english)
+        #expect(Language.asked(in: "English, please.") == .english)
+        #expect(Language.asked(in: "Parle en anglais") == .english)
+        #expect(Language.asked(in: "Passe en français, s'il te plaît") == .french)
+        #expect(Language.asked(in: "French") == .french)
+    }
+
     @Test func aQuestionThatMentionsALanguageIsNotASwitch() {
         #expect(Language.asked(in: "what's on tomorrow") == nil)
         #expect(Language.asked(in: "did the French group reply to Stephane about the assays yesterday") == nil)
         #expect(Language.asked(in: "what did Thierry say in French to the whole MIT group") == nil)
+        #expect(Language.asked(in: "store Wat") == nil)
     }
 
     @Test func frenchIsUsedOnlyWhenItCanBe() {
@@ -153,5 +164,24 @@ struct SpeechDownloadTests {
             Issue.record("expected a failure, got \(download.state)")
             return
         }
+    }
+}
+
+struct WrittenLanguageTests {
+    @Test func eachSentenceIsReadByTheVoiceOfItsOwnLanguage() {
+        #expect(Language.of("Switching to English. I still can't search the web for it.") == .english)
+        #expect(Language.of("Je vous écoute. La recherche de l'article est toujours bloquée.") == .french)
+        // Too short to tell: the conversation's language decides.
+        #expect(Language.of("POMSyn.") == nil)
+    }
+
+    @Test func aWholeAnswerInTheOtherLanguageMovesTheConversation() {
+        let english = "Okay, in English now. Nothing is on your calendar this evening."
+        #expect(Conversation.switchTo(answer: english, from: .french) == .english)
+        #expect(Conversation.switchTo(answer: english, from: .english) == nil)
+        // A French answer that names an English paper stays French.
+        let french = "Je vous conseille l'article Digitising Polyoxometalate Syntheses, car il décrit une chaîne de quatre étapes."
+        #expect(Conversation.switchTo(answer: french, from: .french) == nil)
+        #expect(Conversation.switchTo(answer: "Okay.", from: .french) == nil)
     }
 }

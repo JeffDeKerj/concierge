@@ -6,6 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "Scripts"))
 import pages  # noqa: E402
 
+RESOURCES = Path(__file__).resolve().parents[2] / "Resources"
+
 
 class RouteTests(unittest.TestCase):
     def setUp(self):
@@ -37,7 +39,7 @@ class RouteTests(unittest.TestCase):
         self.assertEqual((status, headers["Content-Type"]), (200, "application/manifest+json"))
         self.assertIn(b'"start_url": "/today"', manifest)
         for icon in ("/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"):
-            self.assertEqual(pages.route(icon, self.folder)[0], 200, icon)
+            self.assertEqual(pages.route(icon, self.folder, RESOURCES)[0], 200, icon)
 
     def test_a_page_comes_with_the_rule_that_fetches_nothing(self):
         status, headers, body = pages.route("/2026-11-27.html?x=1", self.folder)

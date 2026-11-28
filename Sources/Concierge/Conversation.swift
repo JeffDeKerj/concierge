@@ -171,8 +171,14 @@ final class Conversation {
                 return reply
             }
             firstWords = nil
+            let spoken = language
+            let voices = settings
             let outcome = await io.say(parts: sentences, voiceID: settings.voiceID(for: language),
-                                    interruptible: settings.interruptible, in: language) { [weak self] in
+                                    interruptible: settings.interruptible, in: language,
+                                    voiceFor: { sentence in
+                                        let written = Language.of(sentence) ?? spoken
+                                        return (voices.voiceID(for: written), written)
+                                    }) { [weak self] in
                 self?.firstWords = Date()
                 self?.state = .speaking
             }
@@ -184,7 +190,20 @@ final class Conversation {
             log.notice("turn \(turn, privacy: .public): \(reply == nil ? "no answer" : "an answer", privacy: .public), first words after \(Int((self.firstWords ?? Date()).timeIntervalSince(asked)), privacy: .public) s, all of it after \(Int(Date().timeIntervalSince(asked)), privacy: .public) s")
             context = nil
             guard !Task.isCancelled else { return }
-            if reply == nil { return }
+            guard let reply else { return }
+            // Asked for the other language in words the listener mangled
+            // ("store Wat"), the model still answers in it: listen in it too.
+            if let written = Self.switchTo(answer: reply, from: language) {
+                do {
+                    try io.use(written, allowOnline: settings.frenchOnline)
+                    language = written
+                    ConciergeSettings.update { $0.language = written.rawValue }
+                    settings = ConciergeSettings.load()
+                    log.notice("turn \(turn, privacy: .public): the answer was in \(written.rawValue, privacy: .public), so listening in it")
+                } catch {
+                    log.notice("turn \(turn, privacy: .public): the answer was in \(written.rawValue, privacy: .public), which cannot be heard here")
+                }
+            }
         }
     }
 
@@ -230,6 +249,12 @@ final class Conversation {
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: .init())
         NSApp.unhide(nil)
         NSApp.activate()
+    }
+
+    /// The language to go on in when a whole answer came in the other one. Pure, for tests.
+    nonisolated static func switchTo(answer: String, from current: Language) -> Language? {
+        guard answer.split(separator: " ").count >= 6, let written = Language.of(answer), written != current else { return nil }
+        return written
     }
 
     /// What the model reads for a spoken question.
