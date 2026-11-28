@@ -271,6 +271,28 @@ struct FinanceFenceTests {
         #expect(otherArgs[1].contains("deny file-read*") && otherArgs[1].contains("/Documents/Personal/Finance"))
     }
 
+    @Test func onlyDocumentsAreNamedNeverTheIdentifiers() {
+        #expect(AskContext.isDocument("2026 pension statement.pdf"))
+        #expect(AskContext.isDocument("notes.md"))
+        #expect(!AskContext.isDocument("accounts.local.md"))
+        #expect(!AskContext.isDocument("ingest.py"))
+        #expect(!AskContext.isDocument("ledger.csv.bak-2026-11-08"))
+        #expect(!AskContext.isDocument(".DS_Store"))
+    }
+
+    @Test func theFinanceFilesAreListedByTopicNewestFirst() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let pension = root.appendingPathComponent("Pension")
+        try FileManager.default.createDirectory(at: pension, withIntermediateDirectories: true)
+        for (name, age) in [("old.pdf", 100.0), ("new.pdf", 1.0), ("accounts.local.md", 0.0)] {
+            let url = pension.appendingPathComponent(name)
+            try Data().write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
+        }
+        #expect(AskContext.financeFiles(in: root) == "Pension/: new.pdf; old.pdf")
+        try? FileManager.default.removeItem(at: root)
+    }
+
     @Test func onlyClaudeIsToldAboutFinance() {
         let claude = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b", finance: true)
         let other = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")

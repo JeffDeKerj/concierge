@@ -68,7 +68,7 @@ enum AskContext {
             + "each paper's DOI, code and project links are there. To read a paper, start from those "
             + "links before searching the web.")
         parts.append(Self.brain)
-        if finance { parts.append(Self.financeNote) }
+        if finance { parts.append(Self.financeNote + "\n" + Self.financeFiles()) }
         return parts.joined(separator: "\n\n") + "\n\nThe question: "
     }
 
@@ -86,9 +86,38 @@ enum AskContext {
         + "and the recall tools cover their projects' notes and decisions. Search, then read the best hit."
 
     /// For Claude only: where the owner's finance notes are.
-    static let financeNote = "For money questions (spending, statements, pension, taxes), the recall-finance "
-        + "tools search the owner's finance notes, and the files are in ~/Documents/Personal/Finance. "
+    static let financeNote = "For money questions, look in the owner's finance folder, "
+        + "~/Documents/Personal/Finance: one folder per topic, mostly PDF statements, listed below "
+        + "newest first. Read the documents for the topic. The recall-finance search covers "
+        + "only a few written notes on the bank statements, so finding nothing there is no answer. "
         + "Never read or say account numbers."
+
+    /// The finance documents by topic, newest first, names only, for the opening.
+    static func financeFiles(in folder: URL = URL(fileURLWithPath: FinanceFence.folder)) -> String {
+        let fm = FileManager.default
+        let topics = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        var lines: [String] = []
+        for topic in topics.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where topic.hasDirectoryPath {
+            var files: [(String, Date)] = []
+            let walk = fm.enumerator(at: topic, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey])
+            while let url = walk?.nextObject() as? URL {
+                let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey])
+                guard values?.isRegularFile == true, isDocument(url.lastPathComponent) else { continue }
+                files.append((String(url.path.dropFirst(topic.path.count + 1)), values?.contentModificationDate ?? .distantPast))
+            }
+            let newest = files.sorted { $0.1 > $1.1 }.prefix(15).map(\.0)
+            if !newest.isEmpty { lines.append("\(topic.lastPathComponent)/: " + newest.joined(separator: "; ")) }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// A document worth naming: no code, backups, system files or the identifiers file. Pure, for tests.
+    static func isDocument(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        guard !lower.hasPrefix("."), !lower.contains("accounts.local"), !lower.contains(".bak") else { return false }
+        let kept: Set<String> = ["pdf", "md", "txt", "csv", "xlsx", "docx", "odt", "rtf", "jpg", "png", "html"]
+        return kept.contains((lower as NSString).pathExtension)
+    }
 
     /// The Obsidian folder the papers section is written from.
     static let digests = NSHomeDirectory() + "/obsidian/Biochem Data Extraction/digests"
