@@ -90,7 +90,7 @@ enum AskContext {
     static var sessionsNote: String {
         "To see what the owner's Claude Code sessions are doing (which are working, which wait for them, "
             + "what each last said), run exactly: /usr/bin/python3 -I \(Paths.project.path)/Scripts/sessions.py "
-            + "(add a number of hours to look further back; 3 by default). It is read only."
+            + "(add a number of hours to look further back; the last hour by default). It covers this Mac and spark, and is read only."
     }
 
     /// For Claude only: where the owner's finance notes are.

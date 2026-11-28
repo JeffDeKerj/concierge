@@ -31,6 +31,13 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(sessions.state("tool_use", 30), "working")
         self.assertEqual(sessions.state("tool_use", 600), "stopped mid-way")
 
+    def test_only_this_hosts_own_sessions_count(self):
+        home = sessions.HOME_SLUG
+        self.assertTrue(sessions.wanted(home + "-code-brain"))
+        self.assertFalse(sessions.wanted("-Users-someone-else-code-brain"))
+        self.assertFalse(sessions.wanted(home + "-Documents-Personal-Finance"))
+        self.assertFalse(sessions.wanted(home + "--cache-claude-tmp-agy-work-crops"))
+
     def test_the_project_is_named_from_its_folder(self):
         self.assertEqual(sessions.project_name(sessions.HOME_SLUG + "-code-swift-concierge"), "code/swift/concierge")
 
