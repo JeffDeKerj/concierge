@@ -9,8 +9,9 @@ Sonnet in 156 s for $1.39, and the phone got "Morning page ready · nothing
 urgent". Three picks were then built and merged that day: the face holds a
 wing to its ear and one notification goes out when the headset sends only
 silence for a minute (tried live: deaf at 09:06, cleared at 09:07 when the
-owner switched the headset on); a Cost History window by day; and the
-build no longer needs the macOS 26.5 SDK pin. Antigravity cannot build the
+owner switched the headset on); a Cost History window by day; the
+build no longer needs the macOS 26.5 SDK pin; and the pages can be read on
+the phone at `https://apps.tailf7bf45.ts.net:39443/today`, owner only. Antigravity cannot build the
 page: it has no mail, calendar, chat or Slack tools (see Tried). The
 assistant is called Nestor in everything the owner sees or says; the code
 and this repository keep the name Concierge. Session logs:
@@ -27,24 +28,19 @@ no longer sees the morning build: the job runner runs with
 
 ## Next picks
 
-Ordered by the biggest gain. Picks 1 to 5 can be built without the owner,
-but pick 1 puts personal mail on the network and wants the owner's yes first.
+Ordered by the biggest gain. Picks 1 to 4 can be built without the owner.
 
-1. **Serve `briefings/` on the tailnet behind Authentik**, so the page can be
-   read from the phone, with a home-screen bookmark as the first iPhone view.
-   Never without auth: the pages hold personal mail. Touches caddy-proxy and
-   Authentik on spark; read the shared-infra and SSO notes first.
-2. **If the filter still stops pages, make the papers section plainer.** Each
+1. **If the filter still stops pages, make the papers section plainer.** Each
    paper gets its title and one line on why it matters to the extraction work,
    with no assay or toxicity detail. Change `~/.claude/skills/briefing/SKILL.md`.
    On 2026-11-28 the page was whole, so this waits for a stopped section.
-3. **Count filter stops in the job runner.** It keeps no conversation, so a
+2. **Count filter stops in the job runner.** It keeps no conversation, so a
    stop is invisible. `run()` in `tick.py` could look for the classifier's
    words in the JSON result and add a `stopped` count to the `runs.jsonl` line.
-4. **A more natural voice: Kokoro on the Mac.** If Jamie stops being enough,
+3. **A more natural voice: Kokoro on the Mac.** If Jamie stops being enough,
    add Kokoro (small open voice model, runs locally on Apple Silicon) as a
    voice choice next to the Apple voices, with Apple as the fallback.
-5. **The rest of the ideas review** is in [ideas-2026-11-27.md](ideas-2026-11-27.md):
+4. **The rest of the ideas review** is in [ideas-2026-11-27.md](ideas-2026-11-27.md):
    23 ideas not built. The ones with the most in them: a list of promises both
    ways with a ready follow-up draft, the model returning facts while the app
    draws the page, a new WhatsApp message starting a check at once, and a

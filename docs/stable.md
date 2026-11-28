@@ -203,3 +203,18 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   by day, a row-height slider and a bar per day. Opened from the History
   link in the cost line or Agent › Cost History (⇧⌘Y). First seen
   2026-11-28: five days, $17.33, $3.47 a day.
+- **The pages on the phone** (`Scripts/pages.py`, launchd
+  `com.concierge.pages`, plist in `Scripts/`). Read them at
+  `https://apps.tailf7bf45.ts.net:39443/today`; `/` lists every day. Spark's
+  shared Caddy (caddy-proxy `tsnet-node`, `:39443`) admits only the owner's
+  tailnet login, allows only GET and HEAD, and adds the backend secret. The
+  server listens on the Mac's tailnet address (100.85.65.117:39443), refuses
+  any request without that secret (403, also from spark directly), and
+  serves only the dated pages, `/today` (the newest page itself, so a
+  home-screen shortcut always opens the latest day), a list, a manifest and
+  icons. Each page keeps the app's rule that nothing is fetched, opened only
+  to this server's own icon and manifest. The secret is a copy of the Mac
+  backend's, in `~/.config/ixelis/backend-proxy.token` (mode 600); if that
+  secret changes, copy it again. It does not use the Mac's Docker, so it
+  works while Docker is stopped. Pages are read only there: no dismiss
+  buttons, no updates.
