@@ -44,8 +44,12 @@ enum Language: String, CaseIterable, Identifiable {
     /// Said in the new language once it has switched.
     var switched: String { self == .french ? "D'accord, en français." : "Okay, in English." }
     /// Added to the question so the model answers in this language.
+    /// Said for both languages: a conversation that began in French goes on
+    /// in French unless it is told otherwise, even after a switch.
     var answerRule: String {
-        self == .french ? " Answer in French, unless the owner asks for another language." : ""
+        self == .french
+            ? " Answer in French, unless the owner asks for another language."
+            : " Answer in English, unless the owner asks for another language."
     }
     /// For the Test button in Settings.
     var sample: String {

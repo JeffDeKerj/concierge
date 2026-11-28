@@ -62,6 +62,9 @@ enum AskContext {
         }
         if let news = news(updatesJSON) { parts.append(news) }
         parts.append("More is in \(briefingsPath) if a question needs it: agenda/, updates/ and earlier pages.")
+        parts.append("The papers on the page come from the daily digests in \(Self.digests): "
+            + "each paper's DOI, code and project links are there. To read a paper, start from those "
+            + "links before searching the web.")
         return parts.joined(separator: "\n\n") + "\n\nThe question: "
     }
 
@@ -73,8 +76,14 @@ enum AskContext {
     }
 
     /// A page's words without its markup, one block per line.
+    /// The Obsidian folder the papers section is written from.
+    static let digests = NSHomeDirectory() + "/obsidian/Biochem Data Extraction/digests"
+
     static func plainText(_ html: String) -> String {
         var text = html
+        // A web link keeps its address, so a paper on the page can be found again.
+        text = text.replacingOccurrences(of: "<a\\b[^>]*\\bhref=\"(https?://[^\"]+)\"[^>]*>([\\s\\S]*?)</a>",
+                                         with: "$2 ($1)", options: [.regularExpression, .caseInsensitive])
         for block in ["style", "script", "head"] {
             text = text.replacingOccurrences(of: "<\(block)[^>]*>[\\s\\S]*?</\(block)>", with: " ",
                                              options: [.regularExpression, .caseInsensitive])

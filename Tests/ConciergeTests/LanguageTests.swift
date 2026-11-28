@@ -54,7 +54,8 @@ struct LanguageSwitchTests {
 
     @Test func theModelIsToldToAnswerInFrench() {
         #expect(Conversation.spokenPrompt("quel temps demain", context: nil, language: .french).contains("Answer in French"))
-        #expect(!Conversation.spokenPrompt("what's on tomorrow", context: nil).contains("French"))
+        // English is said too: a conversation begun in French otherwise goes on in French.
+        #expect(Conversation.spokenPrompt("what's on tomorrow", context: nil).contains("Answer in English"))
     }
 }
 
@@ -183,5 +184,19 @@ struct WrittenLanguageTests {
         let french = "Je vous conseille l'article Digitising Polyoxometalate Syntheses, car il décrit une chaîne de quatre étapes."
         #expect(Conversation.switchTo(answer: french, from: .french) == nil)
         #expect(Conversation.switchTo(answer: "Okay.", from: .french) == nil)
+    }
+}
+
+struct PageAsTextTests {
+    @Test func aPapersLinkKeepsItsAddress() {
+        let html = #"<li>POMSyn, <a class="x" href="https://doi.org/10.26434/chemrxiv.15012663/v1">on ChemRxiv</a>.</li>"#
+        #expect(AskContext.plainText(html) == "POMSyn, on ChemRxiv (https://doi.org/10.26434/chemrxiv.15012663/v1).")
+        // Only web addresses: an in-page link stays plain words.
+        #expect(AskContext.plainText(##"<a href="#urgent">Urgent</a>"##) == "Urgent")
+    }
+
+    @Test func theModelIsToldWhereThePapersLinksAre() {
+        let opening = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")
+        #expect(opening.contains(AskContext.digests))
     }
 }
