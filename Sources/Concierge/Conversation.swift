@@ -165,24 +165,20 @@ final class Conversation {
             let cutter = SentenceCutter()
             let question = Self.spokenPrompt(heard, context: context, language: language)
             let noAnswer = language.noAnswer
-            let lastSaid = Stamp()
-            // A word while it works, so a long read is not a dead silence.
+            let progress = Progress(language: language)
+            // Words while it works, so a long read is not a dead silence.
             let bridging = Task { @MainActor in
-                var told = 0
-                while !Task.isCancelled, told < 2 {
+                while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(500))
-                    let quiet = Date().timeIntervalSince(lastSaid.date)
-                    if told == 0, cutter.emitted == 0, quiet > Self.firstBridge {
-                        feed.yield(language.oneMoment); told = 1; lastSaid.date = Date()
-                    } else if told >= 1 || cutter.emitted > 0, quiet > Self.laterBridge {
-                        feed.yield(language.stillOnIt); told = 2
-                    }
+                    if let line = progress.tick(answered: cutter.emitted > 0) { feed.yield(line) }
                 }
             }
             let asking = Task { @MainActor () -> String? in
-                let reply = await self.model.ask(heard, prompt: question) { piece in
-                    for sentence in cutter.add(piece) { feed.yield(sentence); lastSaid.date = Date() }
-                }
+                let reply = await self.model.ask(heard, prompt: question, onTool: { tool in
+                    if let line = progress.using(tool) { feed.yield(line) }
+                }, onText: { piece in
+                    for sentence in cutter.add(piece) { feed.yield(sentence); progress.said() }
+                })
                 bridging.cancel()
                 if let rest = cutter.finish() { feed.yield(rest) }
                 // An agent that sends nothing on the way gives its answer whole.
@@ -271,10 +267,6 @@ final class Conversation {
         NSApp.activate()
     }
 
-    /// Seconds of silence before "One moment", and before "Still on it".
-    nonisolated static let firstBridge: TimeInterval = 6
-    nonisolated static let laterBridge: TimeInterval = 20
-
     /// The language to go on in when a whole answer came in the other one. Pure, for tests.
     nonisolated static func switchTo(answer: String, from current: Language) -> Language? {
         guard answer.split(separator: " ").count >= 6, let written = Language.of(answer), written != current else { return nil }
@@ -338,8 +330,58 @@ final class SpokenTurn: NSObject, AVSpeechSynthesizerDelegate {
     }
 }
 
-/// A time that sentences and the bridging words both update.
+/// What to say while an answer is being worked on: "Let me think" early,
+/// then what the agent is doing, then that it is still coming. The clock is
+/// passed in, for tests.
 @MainActor
-final class Stamp {
-    var date = Date()
+final class Progress {
+    /// Seconds with nothing said before "Let me think".
+    static let opening: TimeInterval = 3.5
+    /// Seconds with nothing new before "Still on it" and the like.
+    static let still: TimeInterval = 12
+    /// Seconds at least between two lines about the work.
+    static let apart: TimeInterval = 6
+
+    private let language: Language
+    private let now: () -> Date
+    private let started: Date
+    private var lastSaid: Date?
+    private var thought = false
+    private var stills = 0
+    private var lastLine = ""
+
+    init(language: Language, now: @escaping () -> Date = Date.init) {
+        self.language = language
+        self.now = now
+        started = now()
+    }
+
+    /// A sentence of the answer was said.
+    func said() { lastSaid = now() }
+
+    /// Checked twice a second: a line to say, or nil.
+    func tick(answered: Bool) -> String? {
+        let quiet = now().timeIntervalSince(lastSaid ?? started)
+        if !answered, !thought, lastSaid == nil, quiet > Self.opening {
+            thought = true
+            return say(language.letMeThink)
+        }
+        guard thought || answered, quiet > Self.still, stills < language.stillComing.count else { return nil }
+        stills += 1
+        return say(language.stillComing[stills - 1])
+    }
+
+    /// The agent started a tool: a line about it, unless one was just said.
+    func using(_ tool: String) -> String? {
+        guard let line = language.doing(tool), line != lastLine else { return nil }
+        if let lastSaid, now().timeIntervalSince(lastSaid) < Self.apart { return nil }
+        thought = true
+        return say(line)
+    }
+
+    private func say(_ line: String) -> String {
+        lastSaid = now()
+        lastLine = line
+        return line
+    }
 }

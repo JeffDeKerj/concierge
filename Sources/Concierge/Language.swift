@@ -41,9 +41,32 @@ enum Language: String, CaseIterable, Identifiable {
     var noAnswer: String {
         self == .french ? "Désolé, je n'ai pas eu de réponse." : "Sorry, I could not get an answer."
     }
-    /// Said when an answer is taking a while: at first, then if it goes on.
-    var oneMoment: String { self == .french ? "Un instant." : "One moment." }
-    var stillOnIt: String { self == .french ? "J'y suis encore." : "Still on it." }
+    /// Said when an answer has not started after a few seconds.
+    var letMeThink: String { self == .french ? "Laissez-moi réfléchir." : "Let me think." }
+    /// Said, one after the other, while an answer goes on taking a while.
+    var stillComing: [String] {
+        self == .french
+            ? ["J'y suis encore.", "Ça arrive.", "Encore un petit moment."]
+            : ["Still on it.", "It's coming.", "Just a little longer."]
+    }
+
+    /// What it is doing, from the tool the agent started; nil for a tool
+    /// not worth a word.
+    func doing(_ tool: String) -> String? {
+        let french = self == .french
+        switch tool {
+        case "WebSearch": return french ? "Je cherche." : "Searching for it."
+        case "WebFetch": return french ? "Je le lis." : "Reading it now."
+        case "Read", "Grep", "Glob": return french ? "Je regarde dans vos notes." : "Looking through your notes."
+        case "Agent", "Task": return french ? "Je m'en occupe." : "Working on it."
+        default:
+            if tool.contains("Gmail") { return french ? "Je regarde vos mails." : "Checking your mail." }
+            if tool.contains("Calendar") { return french ? "Je regarde l'agenda." : "Checking your calendar." }
+            if tool.contains("whatsapp") { return french ? "Je regarde WhatsApp." : "Checking WhatsApp." }
+            if tool.contains("Slack") { return french ? "Je regarde Slack." : "Checking Slack." }
+            return nil
+        }
+    }
     /// Said when the owner has not gone on after an answer.
     var standingBy: String { self == .french ? "Je reste là si besoin." : "I'm here when you need me." }
     /// Said in the new language once it has switched.

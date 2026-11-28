@@ -75,6 +75,16 @@ struct ClaudeBackend: AgentBackend {
         }
     }
 
+    /// A tool call opening, the agent's own or a helper's: both are work
+    /// the owner is waiting on.
+    func toolStarted(inLine line: String) -> String? {
+        guard line.contains("\"tool_use\""), line.contains("content_block_start"), let json = JSONReading.object(line),
+              json["type"] as? String == "stream_event", let event = json["event"] as? [String: Any],
+              event["type"] as? String == "content_block_start",
+              let block = event["content_block"] as? [String: Any], block["type"] as? String == "tool_use" else { return nil }
+        return block["name"] as? String
+    }
+
     private func modelArguments(_ model: String) -> [String] {
         model.isEmpty ? [] : ["--model", model]
     }

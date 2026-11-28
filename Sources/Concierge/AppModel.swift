@@ -231,17 +231,18 @@ final class AppModel {
     @MainActor @discardableResult
     /// `onText` gets the answer piece by piece while it is written, when
     /// the agent can send it that way.
-    func ask(_ q: String, prompt: String? = nil, onText: ((String) -> Void)? = nil) async -> String? {
+    func ask(_ q: String, prompt: String? = nil, onTool: ((String) -> Void)? = nil,
+             onText: ((String) -> Void)? = nil) async -> String? {
         guard !isAsking else { return nil }
         isAsking = true
-        return await perform(q, prompt: prompt, onText: onText)
+        return await perform(q, prompt: prompt, onText: onText, onTool: onTool)
     }
 
     /// One run of the agent for a question. The answer shows as it is
     /// written when the agent streams.
     @MainActor
     private func runAsk(_ backend: AgentBackend, _ text: String, _ conversation: AskConversation, model: String,
-                        onText: ((String) -> Void)?) async throws -> RunReport {
+                        onText: ((String) -> Void)?, onTool: ((String) -> Void)? = nil) async throws -> RunReport {
         guard let streaming = backend.streamingAskArguments(question: text, conversation: conversation, model: model) else {
             return backend.parse(try await askRunner.run(backend, arguments: backend.askArguments(question: text, conversation: conversation, model: model)))
         }
@@ -249,6 +250,7 @@ final class AppModel {
         let (lines, feed) = AsyncStream<String>.makeStream()
         let reader = Task { @MainActor in
             for await line in lines {
+                if let tool = backend.toolStarted(inLine: line) { onTool?(tool); continue }
                 guard let piece = backend.textDelta(inLine: line) else { continue }
                 let soFar = (self.answer ?? "") + piece
                 if !soFar.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.answer = soFar }
@@ -263,7 +265,8 @@ final class AppModel {
     }
 
     @MainActor
-    private func perform(_ q: String, prompt: String?, onText: ((String) -> Void)? = nil) async -> String? {
+    private func perform(_ q: String, prompt: String?, onText: ((String) -> Void)? = nil,
+                         onTool: ((String) -> Void)? = nil) async -> String? {
         askError = nil
         answer = nil
         askStopped = false
@@ -283,7 +286,7 @@ final class AppModel {
                 // Tell a running conversation what the daytime jobs found since it last heard.
                 let news = known.updatesStamp == updatesStamp ? nil : AskContext.news(updates)
                 let text = (news.map { "(\($0))\n\n" } ?? "") + sent
-                report = try await runAsk(backend, text, .resume(id: known.id), model: model, onText: onText)
+                report = try await runAsk(backend, text, .resume(id: known.id), model: model, onText: onText, onTool: onTool)
                 if backend.isNoConversation(report), !askStopped { session = nil }
             }
             if session == nil {
@@ -291,7 +294,7 @@ final class AppModel {
                 let opening = AskContext.opening(pageHTML: page.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) },
                                                  pagePath: page?.url.path, updatesJSON: updates,
                                                  briefingsPath: Paths.briefings.path)
-                report = try await runAsk(backend, opening + sent, .fresh(id: id), model: model, onText: onText)
+                report = try await runAsk(backend, opening + sent, .fresh(id: id), model: model, onText: onText, onTool: onTool)
                 session = AskSession(id: report.sessionID ?? id, day: day, backend: backend.id, pageStamp: pageStamp)
             }
             if !report.isError || askStopped, var kept = session {

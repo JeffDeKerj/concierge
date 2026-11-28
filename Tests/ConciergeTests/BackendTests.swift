@@ -45,6 +45,9 @@ extension SerialTests {
         #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"message_start","message":{}},"parent_tool_use_id":null}"#) == "\n")
         #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hm"}},"parent_tool_use_id":null}"#) == nil)
         #expect(b.textDelta(inLine: #"{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"helper"}},"parent_tool_use_id":"toolu_1"}"#) == nil)
+        // A tool starting is named, the agent's own or a helper's.
+        #expect(b.toolStarted(inLine: #"{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t","name":"WebFetch","input":{}}},"parent_tool_use_id":null}"#) == "WebFetch")
+        #expect(b.toolStarted(inLine: piece) == nil)
         #expect(b.textDelta(inLine: #"{"type":"assistant","message":{}}"#) == nil)
         #expect(b.textDelta(inLine: "not json") == nil)
         // The report is the last line.

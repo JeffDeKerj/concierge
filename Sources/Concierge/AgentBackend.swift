@@ -79,6 +79,9 @@ protocol AgentBackend {
     func streamingAskArguments(question: String, conversation: AskConversation, model: String) -> [String]?
     /// The piece of the answer that one line of streamed output carries, if any.
     func textDelta(inLine line: String) -> String?
+    /// The name of a tool the agent starts using in this line, if any, so
+    /// the owner can be told what is happening while they wait.
+    func toolStarted(inLine line: String) -> String?
     /// Read the process output into a report.
     func parse(_ output: ProcessOutput) -> RunReport
     /// True when the failure means there is no conversation to continue.
@@ -109,6 +112,7 @@ extension AgentBackend {
 
     func streamingAskArguments(question: String, conversation: AskConversation, model: String) -> [String]? { nil }
     func textDelta(inLine line: String) -> String? { nil }
+    func toolStarted(inLine line: String) -> String? { nil }
 
     var models: [ModelOption] { [.cliDefault] }
     func defaultModel(for operation: Operation) -> String { "" }
