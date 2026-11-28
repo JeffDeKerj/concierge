@@ -31,7 +31,14 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   read a channel, read a thread), writes into `briefings/` and the
   headless Chrome check. Slack's writing tools are denied for every run in
   `~/.claude/settings.json`. Honoured only once the folder is trusted in
-  `~/.claude.json` (`hasTrustDialogAccepted`).
+  `~/.claude.json` (`hasTrustDialogAccepted`). Since 2026-11-28, so that
+  Nestor can read a paper it is asked about: web search, the Grep and Glob
+  tools, and web page reading from paper and code sites only (preprint
+  servers, publishers, PubMed, Crossref, OpenAlex, GitHub, Hugging Face,
+  Zenodo). Page reading stays limited to those sites because Nestor also
+  reads mail and chats: an open fetch would let a crafted message send
+  private data to any site. ChemRxiv refuses automated readers, so for
+  those papers Nestor falls back to the abstract and the code.
 - **Refresh** (`AppModel.refresh`): the backend's refresh command with the
   project folder as working directory (`claude -p "/briefing" --output-format json`). A watcher checks the file's modification time
   every two seconds and reloads on change; one more check runs after exit. A
