@@ -41,8 +41,6 @@ enum Language: String, CaseIterable, Identifiable {
     var noAnswer: String {
         self == .french ? "Désolé, je n'ai pas eu de réponse." : "Sorry, I could not get an answer."
     }
-    /// Said when an answer has not started after a few seconds.
-    var letMeThink: String { self == .french ? "Laissez-moi réfléchir." : "Let me think." }
     /// Said, one after the other, while an answer goes on taking a while.
     var stillComing: [String] {
         self == .french

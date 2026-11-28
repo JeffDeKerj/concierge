@@ -90,7 +90,7 @@ struct FrenchPhraseTests {
     @Test func whatItSaysByItselfExistsInBothLanguages() {
         for language in Language.allCases {
             for phrase in [language.yes, language.hereIAm, language.okay, language.noAnswer, language.switched, language.sample,
-                           language.letMeThink, language.standingBy] + language.stillComing {
+                           language.standingBy] + language.stillComing {
                 #expect(!phrase.isEmpty)
             }
         }
@@ -220,30 +220,35 @@ struct ProgressTests {
     @Test func aSlowAnswerIsTalkedThrough() {
         let clock = Clock()
         let p = Progress(language: .english, now: { clock.t })
-        clock.t += 2
-        #expect(p.tick(answered: false) == nil)
-        clock.t += 2
-        #expect(p.tick(answered: false) == "Let me think.")
-        clock.t += 7
-        #expect(p.using("WebFetch") == "Reading it now.")
-        // The same work again says nothing new.
-        clock.t += 7
+        // No timed filler: an answer without a lookup comes in a few seconds.
+        clock.t += 5
+        #expect(p.tick() == nil)
+        // The model said its own line before the lookup, so the app keeps quiet.
+        p.said()
+        clock.t += 1
         #expect(p.using("WebFetch") == nil)
+        // A later tool it did not announce gets a line.
+        clock.t += 8
+        #expect(p.using("WebSearch") == "Searching for it.")
+        clock.t += 7
+        #expect(p.using("WebSearch") == nil)
         clock.t += 6
-        #expect(p.tick(answered: false) == "Still on it.")
+        #expect(p.tick() == "Still on it.")
         clock.t += 13
-        #expect(p.tick(answered: false) == "It's coming.")
+        #expect(p.tick() == "It's coming.")
     }
 
     @Test func aQuickAnswerGetsNoFiller() {
         let clock = Clock()
         let p = Progress(language: .english, now: { clock.t })
-        clock.t += 2
+        clock.t += 4
         p.said()
-        clock.t += 5
-        #expect(p.tick(answered: true) == nil)
-        // A tool right after a sentence waits its turn.
-        #expect(p.using("WebSearch") == nil)
+        clock.t += 6
+        #expect(p.tick() == nil)
+    }
+
+    @Test func theModelIsAskedToAnnounceALookup() {
+        #expect(Conversation.spokenPrompt("read the paper", context: nil).contains("Let me look that up."))
     }
 
     @Test func theWorkIsNamedInFrenchToo() {

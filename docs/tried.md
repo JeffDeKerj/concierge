@@ -41,3 +41,11 @@ result, why it fell short, what would change the verdict, and where the detail i
   if Antigravity gets mail and calendar tools of its own; then run one
   Refresh into a test file, since a Refresh overwrites today's page.
 
+
+## A timed "Let me think" (2026-11-28)
+
+Said 3.5 s after a spoken question when nothing had been said. Answers with
+no lookup start 4 to 6 s after the question, so the line came just before
+them and sounded silly. Replaced by the model announcing its own lookups.
+Would work again only with a threshold above the usual first-words time,
+measured from the logs (`turn N: an answer, first words after`).

@@ -170,7 +170,7 @@ final class Conversation {
             let bridging = Task { @MainActor in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(500))
-                    if let line = progress.tick(answered: cutter.emitted > 0) { feed.yield(line) }
+                    if let line = progress.tick() { feed.yield(line) }
                 }
             }
             let asking = Task { @MainActor () -> String? in
@@ -275,7 +275,7 @@ final class Conversation {
 
     /// What the model reads for a spoken question.
     nonisolated static func spokenPrompt(_ heard: String, context: String?, language: Language = .english) -> String {
-        var p = "(The owner said this aloud and will hear your answer read out. Answer in one to three short spoken sentences: no lists, no markdown, no links. You still never send, reply, accept, pay or delete; offer to draft instead.)"
+        var p = "(The owner said this aloud and will hear your answer read out. Answer in one to three short spoken sentences: no lists, no markdown, no links. You still never send, reply, accept, pay or delete; offer to draft instead. If you need to look something up or read something first, begin with one short sentence saying so, such as \"Let me look that up.\", before using any tool; for an answer you already have, just answer.)"
         p += language.answerRule
         if let context { p += " About this alert: \(context)." }
         return p + " \(heard)"
@@ -330,13 +330,14 @@ final class SpokenTurn: NSObject, AVSpeechSynthesizerDelegate {
     }
 }
 
-/// What to say while an answer is being worked on: "Let me think" early,
-/// then what the agent is doing, then that it is still coming. The clock is
-/// passed in, for tests.
+/// What to say while an answer is being worked on: what the agent is
+/// doing when it starts a tool and has not said so itself, then that it is
+/// still coming. No timed "Let me think": an answer without a lookup comes
+/// in 4 to 6 s, and a timer at 3.5 s spoke just before it (2026-11-28). The
+/// model says its own short line before a lookup. The clock is passed in,
+/// for tests.
 @MainActor
 final class Progress {
-    /// Seconds with nothing said before "Let me think".
-    static let opening: TimeInterval = 3.5
     /// Seconds with nothing new before "Still on it" and the like.
     static let still: TimeInterval = 12
     /// Seconds at least between two lines about the work.
@@ -346,7 +347,6 @@ final class Progress {
     private let now: () -> Date
     private let started: Date
     private var lastSaid: Date?
-    private var thought = false
     private var stills = 0
     private var lastLine = ""
 
@@ -360,13 +360,9 @@ final class Progress {
     func said() { lastSaid = now() }
 
     /// Checked twice a second: a line to say, or nil.
-    func tick(answered: Bool) -> String? {
+    func tick() -> String? {
         let quiet = now().timeIntervalSince(lastSaid ?? started)
-        if !answered, !thought, lastSaid == nil, quiet > Self.opening {
-            thought = true
-            return say(language.letMeThink)
-        }
-        guard thought || answered, quiet > Self.still, stills < language.stillComing.count else { return nil }
+        guard quiet > Self.still, stills < language.stillComing.count else { return nil }
         stills += 1
         return say(language.stillComing[stills - 1])
     }
@@ -375,7 +371,6 @@ final class Progress {
     func using(_ tool: String) -> String? {
         guard let line = language.doing(tool), line != lastLine else { return nil }
         if let lastSaid, now().timeIntervalSince(lastSaid) < Self.apart { return nil }
-        thought = true
         return say(line)
     }
 
