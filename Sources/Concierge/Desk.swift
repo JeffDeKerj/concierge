@@ -96,7 +96,11 @@ final class Desk {
     private(set) var waiting: [DeskQuestion] = []
     /// Questions already read out, so each is announced once.
     @ObservationIgnored private var announced: Set<String> = []
-    var unannounced: [DeskQuestion] { waiting.filter { !announced.contains($0.id) } }
+    var unannounced: [DeskQuestion] { waiting.filter { !announced.contains($0.id) && isFresh($0) } }
+    @ObservationIgnored private var arrived: [String: Date] = [:]
+    private func isFresh(_ q: DeskQuestion) -> Bool {
+        Date().timeIntervalSince(arrived[q.id] ?? Date()) < Self.questionLife
+    }
     func markAnnounced(_ id: String) { announced.insert(id) }
     private(set) var away = UserDefaults.standard.bool(forKey: "deskAway")
     /// Called with each new question, for Nestor to read it out while the owner is away.
@@ -167,19 +171,26 @@ final class Desk {
                 guard let event = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
                       event["event"] as? String == "message", let message = event["message"] as? String,
                       let body = DeskSeal.unseal(message, key) else { continue }
-                take(body)
+                let posted = Date(timeIntervalSince1970: (event["time"] as? Double) ?? Date().timeIntervalSince1970)
+                take(body, posted: posted)
             }
         } catch {
             log.notice("desk stream ended: \(error.localizedDescription, privacy: .public)")
         }
     }
 
+    /// A hook gives a question back to its window after 9 minutes; a hook
+    /// that was stopped never says so. Older questions are not read out.
+    static let questionLife: TimeInterval = 540
+
     /// One signed message from a hook or from Nestor itself.
-    func take(_ body: [String: Any]) {
+    func take(_ body: [String: Any], posted: Date = Date(), now: Date = Date()) {
         switch body["kind"] as? String {
         case "question":
-            guard let q = DeskQuestion(body), !waiting.contains(where: { $0.id == q.id }) else { return }
+            guard now.timeIntervalSince(posted) < Self.questionLife,
+                  let q = DeskQuestion(body), !waiting.contains(where: { $0.id == q.id }) else { return }
             waiting.append(q)
+            arrived[q.id] = posted
             log.notice("a \(q.kind.rawValue, privacy: .public) question from \(q.host, privacy: .public)")
             if away { onQuestion?(q) }
         case "closed", "answer":

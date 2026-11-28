@@ -72,3 +72,20 @@ struct DeskTalkTests {
         #expect(short.count <= 280 && short.hasSuffix("Shall I push it?"))
     }
 }
+
+@MainActor
+struct DeskStaleTests {
+    @Test func aQuestionOlderThanItsHookIsNotReadOut() {
+        let desk = Desk()
+        let body: [String: Any] = ["kind": "question", "id": "old", "type": "reply",
+                                   "questions": [["question": "Which colour?", "options": []]]]
+        desk.take(body, posted: Date().addingTimeInterval(-600))
+        #expect(desk.waiting.isEmpty)
+        var fresh = body
+        fresh["id"] = "new"
+        desk.take(fresh, posted: Date().addingTimeInterval(-30))
+        #expect(desk.waiting.map(\.id) == ["new"])
+        desk.take(["kind": "closed", "id": "new"])
+        #expect(desk.waiting.isEmpty)
+    }
+}
