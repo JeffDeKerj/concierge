@@ -86,9 +86,10 @@ enum AskContext {
         + "and the recall tools cover their projects' notes and decisions. Search, then read the best hit."
 
     /// For Claude only: where the owner's finance notes are.
-    static let financeNote = "For money questions, look in the owner's finance folder, "
+    static let financeNote = "For money questions, this comes before the memory search above: look in the owner's finance folder, "
         + "~/Documents/Personal/Finance: one folder per topic, mostly PDF statements, listed below "
-        + "newest first. Read the documents for the topic. The recall-finance search covers "
+        + "newest first. For any question about money, even one that says \"my notes\", read the documents "
+        + "for the topic before answering; never just offer to. The recall-finance search covers "
         + "only a few written notes on the bank statements, so finding nothing there is no answer. "
         + "Never read or say account numbers."
 
