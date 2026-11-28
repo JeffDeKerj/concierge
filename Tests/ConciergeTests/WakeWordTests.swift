@@ -29,6 +29,13 @@ struct WakeWordTests {
         // What the recogniser wrote on 2026-11-28 for "Nestor, Nestor, Nestor".
         #expect(CalledName.after("Leicester Leicester", name: "Nestor") == "")
         #expect(CalledName.after("Lester, what's on tomorrow", name: "Nestor") == "what's on tomorrow")
+        // "Hey Nestor": after "hey", two letters off still counts.
+        #expect(CalledName.after("Hey Hastor, what's on tomorrow", name: "Nestor") == "what's on tomorrow")
+        #expect(CalledName.after("hey nestar", name: "Nestor") == "")
+        #expect(CalledName.after("hey Emma, are you coming", name: "Nestor") == nil)
+        #expect(CalledName.after("hey Peter", name: "Nestor") == nil)
+        #expect(CalledName.after("hey mister", name: "Nestor") == nil)
+        #expect(CalledName.after("Hastor what's on", name: "Nestor") == nil)
         // Only for this name: another name is not woken by Leicester.
         #expect(CalledName.after("Leicester", name: "Max") == nil)
     }

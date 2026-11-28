@@ -21,6 +21,12 @@ enum CalledName {
         return wanted.count >= 5 && distance(heard, wanted) <= 1
     }
 
+    /// Two letters off at most, for a name of five letters or more.
+    private static func close(_ word: String, name: String) -> Bool {
+        let wanted = letters(name)
+        return wanted.count >= 5 && distance(letters(word), wanted, limit: 2) <= 2
+    }
+
     /// What the English recogniser writes for a name it does not know, too
     /// far from the spelling to match by one letter. Seen on 2026-11-28:
     /// "Nestor, Nestor, Nestor" came out as "Nestor Leicester Leicester".
@@ -35,6 +41,9 @@ enum CalledName {
         var last: String.Index?
         for (i, word) in words.enumerated() {
             if matches(word.text, name: name) {
+                last = word.range.upperBound
+            } else if i > 0, letters(words[i - 1].text) == Array("hey"), close(word.text, name: name) {
+                // "Hey Nestor": after "hey", a name two letters off still counts.
                 last = word.range.upperBound
             } else if i + 1 < words.count, matches(word.text + words[i + 1].text, name: name) {
                 // Heard in two pieces: "nest or".
@@ -70,8 +79,8 @@ enum CalledName {
     }
 
     /// How many letters must be changed, added or dropped to turn one word into the other.
-    private static func distance(_ a: [Character], _ b: [Character]) -> Int {
-        if abs(a.count - b.count) > 1 { return 2 }
+    private static func distance(_ a: [Character], _ b: [Character], limit: Int = 1) -> Int {
+        if abs(a.count - b.count) > limit { return limit + 1 }
         var row = Array(0...b.count)
         for (i, x) in a.enumerated() {
             var previous = row[0]

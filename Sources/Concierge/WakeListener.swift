@@ -151,7 +151,7 @@ final class WakeListener {
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
         // Tells the recogniser the name is a word to expect.
-        request.contextualStrings = [name]
+        request.contextualStrings = [name, "Hey \(name)"]
         self.request = request
         io.setWakeRequest(request)
         requestStarted = Date()
