@@ -89,7 +89,8 @@ struct FrenchPhraseTests {
 
     @Test func whatItSaysByItselfExistsInBothLanguages() {
         for language in Language.allCases {
-            for phrase in [language.yes, language.hereIAm, language.okay, language.noAnswer, language.switched, language.sample] {
+            for phrase in [language.yes, language.hereIAm, language.okay, language.noAnswer, language.switched, language.sample,
+                           language.oneMoment, language.stillOnIt, language.standingBy] {
                 #expect(!phrase.isEmpty)
             }
         }
@@ -198,5 +199,16 @@ struct PageAsTextTests {
     @Test func theModelIsToldWhereThePapersLinksAre() {
         let opening = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")
         #expect(opening.contains(AskContext.digests))
+    }
+}
+
+struct ThinkingPauseTests {
+    @Test func aQuestionLeftHangingGetsMoreTime() {
+        let wait = { (heard: String) in VoiceIO.pauseNeeded(after: heard, normal: 1.6, midThought: 3) }
+        #expect(wait("what's on tomorrow") == 1.6)
+        #expect(wait("could you read the paper about") == 3)
+        #expect(wait("what did Thierry say, um") == 3)
+        #expect(wait("qu'est-ce que j'ai demain et") == 3)
+        #expect(wait("Quels sont ces quatre agents ?") == 1.6)
     }
 }

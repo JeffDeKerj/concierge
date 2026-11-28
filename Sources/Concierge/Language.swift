@@ -41,6 +41,11 @@ enum Language: String, CaseIterable, Identifiable {
     var noAnswer: String {
         self == .french ? "Désolé, je n'ai pas eu de réponse." : "Sorry, I could not get an answer."
     }
+    /// Said when an answer is taking a while: at first, then if it goes on.
+    var oneMoment: String { self == .french ? "Un instant." : "One moment." }
+    var stillOnIt: String { self == .french ? "J'y suis encore." : "Still on it." }
+    /// Said when the owner has not gone on after an answer.
+    var standingBy: String { self == .french ? "Je reste là si besoin." : "I'm here when you need me." }
     /// Said in the new language once it has switched.
     var switched: String { self == .french ? "D'accord, en français." : "Okay, in English." }
     /// Added to the question so the model answers in this language.

@@ -31,6 +31,24 @@ final class VoiceIO {
 
     /// The pause that ends a spoken turn.
     var endOfTurnPause: TimeInterval = 1.6
+    /// The pause that ends a turn left hanging on "and", "the" or "um": the
+    /// owner is thinking in the middle of the question.
+    var midThoughtPause: TimeInterval = 3.0
+
+    /// Words a question does not end on, in both languages.
+    nonisolated static let hanging: Set<String> = [
+        "and", "but", "or", "so", "because", "the", "a", "an", "to", "of", "for", "with", "about", "in", "on",
+        "from", "that", "which", "what", "is", "are", "my", "your", "um", "uh", "er", "erm", "hmm", "like",
+        "et", "mais", "ou", "donc", "parce", "que", "qui", "le", "la", "les", "un", "une", "de", "du", "des",
+        "pour", "avec", "sur", "dans", "mon", "ma", "mes", "euh", "ben", "alors",
+    ]
+
+    /// How long a silence must last before the owner's words are taken as
+    /// the whole question. Pure, for tests.
+    nonisolated static func pauseNeeded(after heard: String, normal: TimeInterval, midThought: TimeInterval) -> TimeInterval {
+        let last = words(heard).last.map { Phrases.plain(String($0)) } ?? ""
+        return hanging.contains(last) ? midThought : normal
+    }
     /// Sees the words of the current turn as they come.
     var onWords: ((String) -> Void)?
     /// The words of the turn so far.
@@ -394,13 +412,24 @@ final class VoiceIO {
             if listeningOver, Self.isBargeIn(heard: heard, speaking: sayingText) {
                 log.notice("say: interrupted after \(Self.words(self.heard).count, privacy: .public) words")
                 producer.cancel()
-                player.stop()
+                await fadeOut()
                 return .interrupted
             }
         }
         log.notice("say: finished, heard meanwhile \(Self.words(self.heard).count, privacy: .public) words")
         if listeningOver { endTurn() }
         return .finished
+    }
+
+    /// Stops the voice over a quarter of a second rather than at once.
+    private func fadeOut() async {
+        let start = player.volume
+        for step in stride(from: 1.0, through: 0.0, by: -0.2) {
+            player.volume = start * Float(step)
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        player.stop()
+        player.volume = start
     }
 
     /// How loud Concierge's voice is at `date`, 0 to 1, or nil when it is
@@ -523,7 +552,7 @@ final class VoiceIO {
                 }
                 continue
             }
-            if !heard.isEmpty, quiet > endOfTurnPause || turnOver {
+            if !heard.isEmpty, quiet > Self.pauseNeeded(after: heard, normal: endOfTurnPause, midThought: midThoughtPause) || turnOver {
                 let words = heard
                 log.notice("listen: heard \(Self.words(words).count, privacy: .public) words in \(self.turnSummary(), privacy: .public)")
                 endTurn()

@@ -117,8 +117,13 @@ final class Conversation {
             // After an alert, only a short wait: the owner may be busy.
             let heard = (turn == 0 && firstQuestion != nil)
                 ? firstQuestion
-                : await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : 8)
-            guard !Task.isCancelled, let heard else { return }
+                : await io.listen(waitForSpeech: (quickReply && turn == 0) ? 6 : (turn == 0 ? 8 : 15))
+            guard !Task.isCancelled else { return }
+            guard let heard else {
+                // After an answer the owner may just be thinking: say so rather than go quiet.
+                if turn > 0 { await sayAndEnd(language.standingBy, settings, in: language) }
+                return
+            }
             // "Thanks, Nestor" is a goodbye, and "Nestor, hide" a command.
             let said = CalledName.removed(from: heard, name: Brand.name)
             if let wanted = Language.asked(in: said) {
@@ -160,10 +165,25 @@ final class Conversation {
             let cutter = SentenceCutter()
             let question = Self.spokenPrompt(heard, context: context, language: language)
             let noAnswer = language.noAnswer
+            let lastSaid = Stamp()
+            // A word while it works, so a long read is not a dead silence.
+            let bridging = Task { @MainActor in
+                var told = 0
+                while !Task.isCancelled, told < 2 {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    let quiet = Date().timeIntervalSince(lastSaid.date)
+                    if told == 0, cutter.emitted == 0, quiet > Self.firstBridge {
+                        feed.yield(language.oneMoment); told = 1; lastSaid.date = Date()
+                    } else if told >= 1 || cutter.emitted > 0, quiet > Self.laterBridge {
+                        feed.yield(language.stillOnIt); told = 2
+                    }
+                }
+            }
             let asking = Task { @MainActor () -> String? in
                 let reply = await self.model.ask(heard, prompt: question) { piece in
-                    for sentence in cutter.add(piece) { feed.yield(sentence) }
+                    for sentence in cutter.add(piece) { feed.yield(sentence); lastSaid.date = Date() }
                 }
+                bridging.cancel()
                 if let rest = cutter.finish() { feed.yield(rest) }
                 // An agent that sends nothing on the way gives its answer whole.
                 if cutter.emitted == 0 { feed.yield(reply ?? noAnswer) }
@@ -251,6 +271,10 @@ final class Conversation {
         NSApp.activate()
     }
 
+    /// Seconds of silence before "One moment", and before "Still on it".
+    nonisolated static let firstBridge: TimeInterval = 6
+    nonisolated static let laterBridge: TimeInterval = 20
+
     /// The language to go on in when a whole answer came in the other one. Pure, for tests.
     nonisolated static func switchTo(answer: String, from current: Language) -> Language? {
         guard answer.split(separator: " ").count >= 6, let written = Language.of(answer), written != current else { return nil }
@@ -312,4 +336,10 @@ final class SpokenTurn: NSObject, AVSpeechSynthesizerDelegate {
         done?.resume()
         done = nil
     }
+}
+
+/// A time that sentences and the bridging words both update.
+@MainActor
+final class Stamp {
+    var date = Date()
 }
