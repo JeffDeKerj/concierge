@@ -33,3 +33,11 @@ result, why it fell short, what would change the verdict, and where the detail i
   only if Apple makes the processor cheap. Detail:
   [sessions/2026-11-26b.md](sessions/2026-11-26b.md).
 
+- **2026-11-28 · Build the morning page through Antigravity.** Not run:
+  `agy mcp list` shows only the two recall servers, with no Gmail, Google
+  Calendar, WhatsApp or Slack. The briefing reads those through the Claude
+  sign-in's connectors, which `agy` does not have, so its page would hold the
+  Obsidian digest and nothing else. Claude stays the default. Verdict changes
+  if Antigravity gets mail and calendar tools of its own; then run one
+  Refresh into a test file, since a Refresh overwrites today's page.
+
