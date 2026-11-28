@@ -1,10 +1,9 @@
 """Serve Nestor's morning pages to the phone, read only.
 
-launchd keeps this running (Scripts/com.concierge.pages.plist). It listens on
-the Mac's own tailnet address only, and is reached through the shared front on
-spark (caddy-proxy tsnet-node, owner only), which adds a secret header to every
-request it passes on. Any request without that secret is refused, so a tailnet
-peer that calls the Mac directly gets nothing: the pages hold personal mail.
+It runs in Docker (docker-compose.yml, service `pages`) and is reached only
+through the Mac's relay (caddy-proxy mac-backend, port 39443), which refuses any
+request without the secret that the shared front on spark adds, owner only.
+The container publishes no port of its own: the pages hold personal mail.
 
 What it serves:
   /                  a list of the pages, newest first
@@ -17,7 +16,6 @@ Nothing else under briefings/ is reachable.
 """
 from __future__ import annotations
 
-import hmac
 import html
 import json
 import os
@@ -32,11 +30,8 @@ RES = ROOT / "Resources"
 # Served path -> file, for the home-screen shortcut.
 ICONS = {"/apple-touch-icon.png": "apple-touch-icon.png", "/icon-192.png": "icon-192.png",
          "/icon-512.png": "icon-512.png"}
-HOST = os.environ.get("CONCIERGE_PAGES_HOST", "100.85.65.117")
-PORT = int(os.environ.get("CONCIERGE_PAGES_PORT", "39443"))
-TOKEN_FILE = Path(os.environ.get("CONCIERGE_PAGES_TOKEN_FILE",
-                                 Path.home() / ".config/ixelis/backend-proxy.token"))
-HEADER = "X-Ixelis-Proxy-Token"
+HOST = os.environ.get("CONCIERGE_PAGES_HOST", "0.0.0.0")
+PORT = int(os.environ.get("CONCIERGE_PAGES_PORT", "8080"))
 NAME = "Nestor"
 PAGE = re.compile(r"^/(\d{4}-\d{2}-\d{2})\.html$")
 # The app's own rule for a page (PageGuard.swift), opened only to this server's
@@ -59,19 +54,6 @@ ALWAYS = {
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
 }
-
-
-def read_token(path: Path) -> str | None:
-    try:
-        token = path.read_text().strip()
-    except OSError:
-        return None
-    return token or None
-
-
-def allowed(sent: str | None, token: str | None) -> bool:
-    """Whether the request came through the front. No token set refuses all. Pure, for tests."""
-    return bool(token) and sent is not None and hmac.compare_digest(sent.encode(), token.encode())
 
 
 def pages(folder: Path) -> list[str]:
@@ -163,10 +145,7 @@ class Handler(BaseHTTPRequestHandler):
         self.answer(with_body=False)
 
     def answer(self, with_body: bool) -> None:
-        if not allowed(self.headers.get(HEADER), read_token(TOKEN_FILE)):
-            status, headers, body = 403, {"Content-Type": "text/plain; charset=utf-8"}, b"Forbidden"
-        else:
-            status, headers, body = route(self.path, B)
+        status, headers, body = route(self.path, B)
         self.send_response(status)
         for k, v in {**ALWAYS, **headers, "Content-Length": str(len(body))}.items():
             self.send_header(k, v)
@@ -175,13 +154,11 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def log_message(self, fmt: str, *args) -> None:
-        # Path and status only: no header, so the secret never reaches the log.
+        # Path and status only, never a header.
         sys.stderr.write(f"{self.log_date_time_string()} {self.command} {self.path.split('?', 1)[0]} {args[1] if len(args) > 1 else ''}\n")
 
 
 def main() -> int:
-    if read_token(TOKEN_FILE) is None:
-        sys.stderr.write(f"pages: no secret in {TOKEN_FILE}; every request would be refused\n")
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
     return 0
 

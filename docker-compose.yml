@@ -1,0 +1,26 @@
+# Nestor's morning pages for the phone. No port is published: the Mac's relay
+# (caddy-proxy mac-backend, :39443) reaches it on the web-proxy network and
+# lets in only requests from the shared front on spark, owner only.
+name: concierge
+
+services:
+  pages:
+    build:
+      context: .
+      dockerfile: Dockerfile.pages
+    image: ${COMPOSE_PROJECT_NAME:-concierge}-pages:local
+    container_name: nestor-pages
+    restart: unless-stopped
+    user: "1003:1003"
+    read_only: true
+    environment:
+      TZ: ${HOST_TZ:-Europe/London}
+    volumes:
+      - ./briefings:/app/briefings:ro
+      - ${HOST_ZONEINFO:-/usr/share/zoneinfo}:/usr/share/zoneinfo:ro
+    networks:
+      - web-proxy
+
+networks:
+  web-proxy:
+    external: true

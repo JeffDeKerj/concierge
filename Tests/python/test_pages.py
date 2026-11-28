@@ -7,16 +7,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "Scripts"))
 import pages  # noqa: E402
 
 
-class GateTests(unittest.TestCase):
-    def test_only_the_secret_gets_in(self):
-        self.assertTrue(pages.allowed("s3cret", "s3cret"))
-        self.assertFalse(pages.allowed("wrong", "s3cret"))
-        self.assertFalse(pages.allowed(None, "s3cret"))
-        # No secret on the Mac refuses everything, even an empty header.
-        self.assertFalse(pages.allowed("", None))
-        self.assertFalse(pages.allowed("", ""))
-
-
 class RouteTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()

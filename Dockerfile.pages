@@ -1,0 +1,10 @@
+# The page server for the phone (Scripts/pages.py). The pages themselves are
+# mounted read only from briefings/; only the code and the icons are baked in.
+FROM python:3.12-slim
+RUN groupadd -g 1003 mit && useradd -u 1003 -g 1003 -M -s /usr/sbin/nologin mit
+WORKDIR /app
+COPY Scripts/pages.py Scripts/pages.py
+COPY Resources/apple-touch-icon.png Resources/icon-192.png Resources/icon-512.png Resources/
+USER 1003:1003
+EXPOSE 8080
+CMD ["python3", "-I", "/app/Scripts/pages.py"]

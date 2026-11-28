@@ -11,7 +11,7 @@ wing to its ear and one notification goes out when the headset sends only
 silence for a minute (tried live: deaf at 09:06, cleared at 09:07 when the
 owner switched the headset on); a Cost History window by day; the
 build no longer needs the macOS 26.5 SDK pin; and the pages can be read on
-the phone at `https://apps.tailf7bf45.ts.net:39443/today`, owner only. Antigravity cannot build the
+the phone at `https://apps.tailf7bf45.ts.net:39443/today`, owner only, served from Docker. Antigravity cannot build the
 page: it has no mail, calendar, chat or Slack tools (see Tried). The
 assistant is called Nestor in everything the owner sees or says; the code
 and this repository keep the name Concierge. Session logs:
