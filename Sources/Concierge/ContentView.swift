@@ -112,6 +112,7 @@ struct ContentView: View {
 /// what the run would have cost.
 struct CostLine: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let refresh = model.lastRefresh?.summary ?? ""
@@ -127,8 +128,14 @@ struct CostLine: View {
                         .accessibilityIdentifier("cost.ask")
                 }
                 if model.today.runs > 0 {
-                    Text("Today: \(String(format: "$%.2f", model.today.costUSD)) over \(model.today.runs) \(model.today.runs == 1 ? "run" : "runs") · \(model.backend.displayName)")
-                        .accessibilityIdentifier("cost.today")
+                    HStack(spacing: 6) {
+                        Text("Today: \(String(format: "$%.2f", model.today.costUSD)) over \(model.today.runs) \(model.today.runs == 1 ? "run" : "runs") · \(model.backend.displayName)")
+                            .accessibilityIdentifier("cost.today")
+                        Button("History") { openWindow(id: CostHistoryView.windowID) }
+                            .buttonStyle(.link)
+                            .help("Cost by day (⇧⌘Y)")
+                            .accessibilityIdentifier("cost.history")
+                    }
                 }
             }
             .font(.caption)

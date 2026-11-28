@@ -74,6 +74,7 @@ struct ConciergeApp: App {
                 ModelMenu(model: model, operation: .ask, selection: Binding(
                     get: { model.askModel }, set: { model.askModel = $0 }))
                 Divider()
+                CostHistoryMenuItem()
                 Button("Reveal Run Log in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([Paths.briefings.appendingPathComponent("runs.jsonl")])
                 }
@@ -95,6 +96,10 @@ struct ConciergeApp: App {
                 .help("Show every dismissed item again and let the generator list them next time")
             }
         }
+        Window("Cost History", id: CostHistoryView.windowID) {
+            CostHistoryView()
+        }
+        .defaultSize(width: 760, height: 420)
         Settings { SettingsView().preferredColorScheme(.dark) }
     }
 }

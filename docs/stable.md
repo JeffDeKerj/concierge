@@ -196,3 +196,10 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   Sound coming back, or the wake word being off or silenced, clears it.
   Tried live 2026-11-28: deaf at 09:06:36 with the headset off, cleared at
   09:07:37 when the owner switched it on.
+- **Cost history** (`CostHistory.swift`): a window with one row per day from
+  `runs.jsonl` (Europe/London days), split into morning page (`refresh`,
+  `morning`, `morning-test`), questions (`ask`) and daytime jobs (`check`,
+  `prep`, `wrapup`), with runs and failed runs. Sortable columns, a filter
+  by day, a row-height slider and a bar per day. Opened from the History
+  link in the cost line or Agent › Cost History (⇧⌘Y). First seen
+  2026-11-28: five days, $17.33, $3.47 a day.
