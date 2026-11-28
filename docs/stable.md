@@ -43,7 +43,16 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   (`mcp__recall-personal__search`/`get`: the Obsidian notes, paper notes,
   digests, work summaries), read only, next to the code search it already
   had. The question opening (`AskContext.brain`) tells it to search there for
-  anything beyond today's page. The finance search stays out.
+  anything beyond today's page. **Finance is for Claude only** (owner,
+  2026-11-28): Claude-run Nestor gets brain's finance search
+  (`recall-finance`, registered at local scope for this folder with
+  `claude mcp add --scope local`) and may read the finance folder, except the
+  identifiers file (`accounts.local*`, denied) and any edit there; the
+  opening mentions finance only for Claude (`AskContext.financeNote`).
+  Antigravity and Codex run inside `sandbox-exec` with the finance folder
+  denied (`FinanceFence`): their own settings could not fence it (tried:
+  Antigravity's deny rules and trusted folders; it read a test file anyway,
+  and under the sandbox got "operation not permitted").
 - **Refresh** (`AppModel.refresh`): the backend's refresh command with the
   project folder as working directory (`claude -p "/briefing" --output-format json`). A watcher checks the file's modification time
   every two seconds and reloads on change; one more check runs after exit. A

@@ -35,8 +35,9 @@ final class AgentRunner {
         }
 
         let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
+        let (launched, launchArguments) = FinanceFence.wrap(backend.id, executable: executable, arguments: arguments)
+        process.executableURL = launched
+        process.arguments = launchArguments
         process.currentDirectoryURL = Paths.project
 
         var env = ProcessInfo.processInfo.environment
@@ -95,4 +96,25 @@ final class AgentRunner {
     }
 
     var isRunning: Bool { process?.isRunning ?? false }
+}
+
+/// The owner's finance notes are for Claude only (owner, 2026-11-28). Claude
+/// Code is fenced by its own permission list; Antigravity and Codex have no
+/// per-folder deny that holds (tried: Antigravity's deny rules and trusted
+/// folders did not stop a read), so they run inside the Mac's sandbox with
+/// the finance folder walled off.
+enum FinanceFence {
+    static let folder = NSHomeDirectory() + "/Documents/Personal/Finance"
+
+    /// The sandbox rules: everything as usual but reading the finance folder.
+    static var profile: String {
+        let path = (folder as NSString).resolvingSymlinksInPath
+        return "(version 1)(allow default)(deny file-read* (subpath \"\(path)\"))"
+    }
+
+    /// What to launch for a backend. Pure, for tests.
+    static func wrap(_ backendID: String, executable: URL, arguments: [String]) -> (URL, [String]) {
+        guard backendID != "claude" else { return (executable, arguments) }
+        return (URL(fileURLWithPath: "/usr/bin/sandbox-exec"), ["-p", profile, executable.path] + arguments)
+    }
 }

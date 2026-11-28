@@ -18,6 +18,8 @@
       "mcp__recall__get",
       "mcp__recall__search",
       "mcp__recall-personal__get",
+      "mcp__recall-finance__get",
+      "mcp__recall-finance__search",
       "mcp__recall-personal__search",
       "Read",
       "Edit(briefings/**)",
@@ -75,6 +77,10 @@
     ],
     "additionalDirectories": [
       "/Users/jeffdekerj/obsidian/Biochem Data Extraction/digests"
+    ],
+    "deny": [
+      "Read(~/Documents/Personal/Finance/**/accounts.local*)",
+      "Edit(~/Documents/Personal/Finance/**)"
     ]
   }
 }

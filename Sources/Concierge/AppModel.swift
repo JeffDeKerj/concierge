@@ -293,7 +293,8 @@ final class AppModel {
                 let id = UUID().uuidString.lowercased()
                 let opening = AskContext.opening(pageHTML: page.flatMap { try? String(contentsOf: $0.url, encoding: .utf8) },
                                                  pagePath: page?.url.path, updatesJSON: updates,
-                                                 briefingsPath: Paths.briefings.path)
+                                                 briefingsPath: Paths.briefings.path,
+                                                 finance: backend.id == "claude")
                 report = try await runAsk(backend, opening + sent, .fresh(id: id), model: model, onText: onText, onTool: onTool)
                 session = AskSession(id: report.sessionID ?? id, day: day, backend: backend.id, pageStamp: pageStamp)
             }

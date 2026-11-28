@@ -259,3 +259,22 @@ struct ProgressTests {
         #expect(Language.english.doing("ToolSearch") == nil)
     }
 }
+
+struct FinanceFenceTests {
+    @Test func onlyClaudeRunsWithoutTheFence() {
+        let exe = URL(fileURLWithPath: "/bin/agent")
+        let (claude, claudeArgs) = FinanceFence.wrap("claude", executable: exe, arguments: ["-p", "hi"])
+        #expect(claude == exe && claudeArgs == ["-p", "hi"])
+        let (other, otherArgs) = FinanceFence.wrap("antigravity", executable: exe, arguments: ["-p", "hi"])
+        #expect(other.path == "/usr/bin/sandbox-exec")
+        #expect(otherArgs.suffix(3) == ["/bin/agent", "-p", "hi"])
+        #expect(otherArgs[1].contains("deny file-read*") && otherArgs[1].contains("/Documents/Personal/Finance"))
+    }
+
+    @Test func onlyClaudeIsToldAboutFinance() {
+        let claude = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b", finance: true)
+        let other = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")
+        #expect(claude.contains("recall-finance"))
+        #expect(!other.contains("inance"))
+    }
+}
