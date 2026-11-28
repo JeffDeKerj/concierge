@@ -2,10 +2,11 @@
 
 Traps and non-obvious constraints, one bullet each.
 
-- **Build flags.** Plain `swift build` / `swift test` fail on this box since the
-  2026-09-10 Command Line Tools update; always go through
-  `Scripts/swift-build-flags.sh` (`make_app.sh` and `test.sh` already do). There
-  is no XCTest in the Command Line Tools; tests are Swift Testing.
+- **Build flags.** Plain `swift build` works again (Swift 6.4.2, checked
+  2026-11-28); the macOS 26.5 SDK pin is gone. `swift test` still needs the
+  Testing framework path from `Scripts/swift-build-flags.sh`, so run tests
+  through `Scripts/test.sh`. There is no XCTest in the Command Line Tools;
+  tests are Swift Testing.
 - **The CLI must be logged in.** The app runs the standalone `~/.local/bin/claude`.
   Logged out, both Refresh and the follow-up fail with an authentication line
   in red; `claude auth login` in a terminal fixes it. Logged in, the CLI also

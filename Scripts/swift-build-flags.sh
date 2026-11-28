@@ -2,18 +2,10 @@
 # Shared `swift build` / `swift test` flags. Sourced by make_app.sh and the
 # test runner; sets SWIFT_BUILD_FLAGS as an array.
 #
-# The Command Line Tools update of 2026-09-10 (Swift 6.4, macOS 27 SDK) broke
-# the default "swiftbuild" backend on this box — every package, even a fresh
-# `swift package init`, dies with "Could not initialize build system … Unknown
-# error parsing property list". The native backend works but cannot find the
-# SwiftUI macro plugin in the macOS 27 SDK, so we pin the previous SDK while
-# it is still installed. Delete this once a toolchain update fixes the default.
-SDK_265="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
-if [ -d "$SDK_265" ]; then
-  SWIFT_BUILD_FLAGS=(--build-system native --sdk "$SDK_265")
-else
-  SWIFT_BUILD_FLAGS=()
-fi
+# Plain `swift build` works again with the Command Line Tools of
+# 2026-11 (checked 2026-11-28). From 2026-09-10 it had needed the native
+# build system and the macOS 26.5 SDK; that pin is gone.
+SWIFT_BUILD_FLAGS=()
 
 # `swift test` additionally needs the Testing framework, which the Command
 # Line Tools keep outside the SDK search path. (There is no XCTest in the
