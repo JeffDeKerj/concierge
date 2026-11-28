@@ -270,10 +270,12 @@ final class FacePlace {
 }
 
 /// Concierge's face in the top bar, where it rests. It shows what Concierge
-/// is doing, sleeps while silenced, and a click starts a conversation.
+/// is doing, sleeps while silenced, holds a hand to its ear while the
+/// microphone sends nothing, and a click starts a conversation.
 struct FaceButton: View {
     @Environment(Conversation.self) private var talk
     @Environment(FacePlace.self) private var place
+    @Environment(Hearing.self) private var hearing
     @State private var hovered = false
     @State private var s = ConciergeSettings.load()
     private var silenced: Bool { s.isSilenced() }
@@ -284,7 +286,8 @@ struct FaceButton: View {
         } label: {
             FaceView(style: s.faceStyle,
                      expression: Face.expression(state: .idle, hasError: talk.error != nil,
-                                                 silenced: silenced, hovered: hovered))
+                                                 silenced: silenced, hovered: hovered,
+                                                 deaf: hearing.problem != nil))
                 .frame(width: 30, height: 30)
                 .contentShape(Rectangle())
                 // While it is on stage, its place in the bar is empty.
@@ -295,7 +298,8 @@ struct FaceButton: View {
         .background(PlaceProbe { x in
             if abs((place.restX ?? -1) - x) > 0.5 { place.restX = x }
         })
-        .help(talk.isActive ? "Stop the conversation" : silenced ? "\(Brand.name) is silenced. Click to talk anyway (⌘T)" : "Talk to \(Brand.name) (⌘T)")
+        .help(talk.isActive ? "Stop the conversation" : silenced ? "\(Brand.name) is silenced. Click to talk anyway (⌘T)"
+              : hearing.words ?? "Talk to \(Brand.name) (⌘T)")
         .keyboardShortcut("t", modifiers: .command)
         .accessibilityLabel(talk.isActive ? "Stop talking" : "Talk to \(Brand.name)")
         .accessibilityIdentifier("toolbar.talk")

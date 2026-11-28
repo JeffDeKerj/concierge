@@ -11,9 +11,12 @@ struct FaceExpressionTests {
         #expect(Face.expression(state: .speaking, hasError: false, silenced: true, hovered: false) == .speaking)
     }
 
-    @Test func atRestItShowsTroubleThenSleepThenThePointer() {
-        #expect(Face.expression(state: .idle, hasError: true, silenced: true, hovered: true) == .trouble)
-        #expect(Face.expression(state: .idle, hasError: false, silenced: true, hovered: true) == .asleep)
+    @Test func atRestItShowsTroubleThenSleepThenDeafnessThenThePointer() {
+        #expect(Face.expression(state: .idle, hasError: true, silenced: true, hovered: true, deaf: true) == .trouble)
+        #expect(Face.expression(state: .idle, hasError: false, silenced: true, hovered: true, deaf: true) == .asleep)
+        #expect(Face.expression(state: .idle, hasError: false, silenced: false, hovered: true, deaf: true) == .deaf)
+        #expect(Face.expression(state: .idle, hasError: false, silenced: false, hovered: false, deaf: true) == .deaf)
+        #expect(Face.expression(state: .listening(""), hasError: false, silenced: false, hovered: false, deaf: true) == .listening)
         #expect(Face.expression(state: .idle, hasError: false, silenced: false, hovered: true) == .attentive)
         #expect(Face.expression(state: .idle, hasError: false, silenced: false, hovered: false) == .idle)
     }
@@ -153,7 +156,7 @@ struct FaceStageTests {
 struct FaceSheetTests {
     @Test func drawTheSheet() throws {
         guard let path = ProcessInfo.processInfo.environment["FACE_SHEET"] else { return }
-        let expressions: [Face.Expression] = [.idle, .listening, .thinking, .speaking, .asleep, .trouble]
+        let expressions: [Face.Expression] = [.idle, .listening, .thinking, .speaking, .asleep, .trouble, .deaf]
         func face(_ style: Face.Style, _ expression: Face.Expression, _ side: CGFloat, _ time: Double) -> some View {
             Canvas { context, size in
                 FaceDrawing(style: style, pose: Face.pose(for: expression), time: time, level: 0.7)
@@ -168,7 +171,7 @@ struct FaceSheetTests {
                 ForEach(expressions, id: \.self) { expression in
                     Text(String(describing: expression)).frame(width: 170)
                 }
-                Text("in the window").frame(width: 150)
+                Text("in the window").frame(width: 210)
             }
             .font(.title3).foregroundStyle(.secondary)
             ForEach(Array(styles.enumerated()), id: \.offset) { row, style in
@@ -180,8 +183,11 @@ struct FaceSheetTests {
                     HStack(spacing: 14) {
                         face(style, .idle, 60, 7.9)
                         face(style, .asleep, 60, 8.3)
+                        face(style, .deaf, 60, 8.7)
+                        // The size of the top bar.
+                        face(style, .deaf, 30, 8.7)
                     }
-                    .frame(width: 150)
+                    .frame(width: 210)
                 }
             }
         }

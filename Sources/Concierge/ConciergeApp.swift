@@ -8,6 +8,7 @@ struct ConciergeApp: App {
     @State private var wake: WakeListener
     @State private var face: FacePanel
     @State private var place = FacePlace()
+    @State private var hearing: Hearing
 
     init() {
         // launchd starts the app with --tick to run the scheduled jobs: no window.
@@ -24,7 +25,9 @@ struct ConciergeApp: App {
         let conversation = Conversation(model: model, io: io)
         _model = State(initialValue: model)
         _conversation = State(initialValue: conversation)
-        let wake = WakeListener(conversation: conversation, io: io)
+        let hearing = Hearing()
+        _hearing = State(initialValue: hearing)
+        let wake = WakeListener(conversation: conversation, io: io, hearing: hearing)
         _wake = State(initialValue: wake)
         wake.run()
         let face = FacePanel(conversation: conversation)
@@ -46,6 +49,7 @@ struct ConciergeApp: App {
                 .environment(model)
                 .environment(conversation)
                 .environment(place)
+                .environment(hearing)
                 .preferredColorScheme(.dark)
                 .frame(minWidth: 560, minHeight: 600)
         }

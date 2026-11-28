@@ -141,3 +141,7 @@ Traps and non-obvious constraints, one bullet each.
   to run downlink DSP (state fault)" and "failed to write uplink microphone
   input signal" appear when echo cancellation is switched on or off, in
   conversations that work as in ones that do not.
+- **Killing the app counts as a crash to macOS.** After `kill`, the next
+  launch shows "unexpectedly quit while reopening windows" and opens no main
+  window until it is answered. Quit through the app's menu when the owner is
+  at the desk; answer Reopen with the computer-use tools otherwise.

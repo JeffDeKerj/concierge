@@ -36,11 +36,13 @@ enum Face {
         case listening, thinking, speaking
         /// The last conversation ended with an error.
         case trouble
+        /// The microphone sends nothing: a hand at its ear.
+        case deaf
     }
 
     /// The expression for what Concierge is doing.
     static func expression(state: Conversation.State, hasError: Bool,
-                           silenced: Bool, hovered: Bool) -> Expression {
+                           silenced: Bool, hovered: Bool, deaf: Bool = false) -> Expression {
         switch state {
         case .listening: return .listening
         case .thinking: return .thinking
@@ -48,6 +50,8 @@ enum Face {
         case .idle:
             if hasError { return .trouble }
             if silenced { return .asleep }
+            // Kept under the pointer too: the tooltip says what to do.
+            if deaf { return .deaf }
             return hovered ? .attentive : .idle
         }
     }
@@ -74,6 +78,8 @@ enum Face {
         var talk = 0.0
         /// The rings at the ears while it listens.
         var ears = 0.0
+        /// A hand cupped behind its ear: it cannot hear.
+        var cup = 0.0
         /// Head tilt in degrees.
         var tilt = 0.0
         /// How brightly the eyes, mouth and antenna shine.
@@ -90,7 +96,7 @@ enum Face {
                 lookX: mix(lookX, other.lookX), lookY: mix(lookY, other.lookY),
                 closed: mix(closed, other.closed), wander: mix(wander, other.wander),
                 smile: mix(smile, other.smile), gape: mix(gape, other.gape), wave: mix(wave, other.wave),
-                talk: mix(talk, other.talk), ears: mix(ears, other.ears),
+                talk: mix(talk, other.talk), ears: mix(ears, other.ears), cup: mix(cup, other.cup),
                 tilt: mix(tilt, other.tilt), glow: mix(glow, other.glow),
                 red: mix(red, other.red), green: mix(green, other.green), blue: mix(blue, other.blue))
         }
@@ -115,6 +121,10 @@ enum Face {
         case .trouble:
             Pose(eyeWidth: 10, eyeHeight: 10.5, lookY: 0.35, smile: -0.6, glow: 0.85,
                  red: 1.0, green: 0.74, blue: 0.42)
+        case .deaf:
+            // It leans towards the hand and looks that way, puzzled.
+            Pose(eyeWidth: 12, eyeHeight: 16, lookX: 0.7, lookY: -0.15, smile: -0.25, cup: 1, tilt: 7,
+                 glow: 0.95, red: 1.0, green: 0.84, blue: 0.36)
         }
     }
 
@@ -216,7 +226,7 @@ enum Face {
         case .asleep:
             // Closed eyes neither blink nor glance.
             return changing ? fullInterval : restInterval
-        case .idle, .trouble:
+        case .idle, .trouble, .deaf:
             if changing { return fullInterval }
             let roams = pose(for: expression).wander > 0
             for step in 0...4 {

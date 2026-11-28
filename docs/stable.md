@@ -186,3 +186,13 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   page ready · 2 urgent items" through ntfy (`morning_notice`), or after
   the last failed try that there is no page today. The Claude desktop task `morning-briefing` that did
   this before is switched off, not deleted.
+- **Showing when Nestor cannot hear** (`Hearing.swift`). The wake listener
+  looks at the microphone every 5 s; a minute of pure silence (`SilenceWatch`)
+  or a minute with no microphone that starts sets `Hearing.problem`. The face
+  in the top bar then holds a hand (a wing, a paw) to its ear (`Face.Expression.deaf`),
+  its tooltip says what to do, and one Mac notification is sent each time
+  hearing is lost. The advice follows the lid (`Lid.isClosed`): lid closed,
+  only "switch the headset on"; lid open, also the Mac's own microphone.
+  Sound coming back, or the wake word being off or silenced, clears it.
+  Tried live 2026-11-28: deaf at 09:06:36 with the headset off, cleared at
+  09:07:37 when the owner switched it on.

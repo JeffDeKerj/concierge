@@ -671,6 +671,36 @@ struct FaceDrawing {
             g.stroke(nose, with: .color(ink.opacity(0.45)), style: StrokeStyle(lineWidth: 1.4 * u, lineCap: .round))
         }
 
+        if pose.cup > 0.01 {
+            // It cannot hear: a hand (a wing, a paw) cupped behind its ear.
+            // Paler than the body and edged, so it shows on a dark bar.
+            let (fill, edge): (Color, Color) = switch style {
+            case .owl: (Color(red: 0.83, green: 0.69, blue: 0.55), Color(red: 0.36, green: 0.25, blue: 0.19))
+            case .penguin: (Color(red: 0.36, green: 0.43, blue: 0.62), Color(red: 0.11, green: 0.13, blue: 0.23))
+            case .pup: (Color(red: 0.99, green: 0.88, blue: 0.68), Color(red: 0.60, green: 0.40, blue: 0.22))
+            case .bellhop: (Color(red: 0.99, green: 0.86, blue: 0.75), hair)
+            case .sprout: (tint(0.6), tint(-0.3))
+            case .halo: (night[0], light)
+            case .robot, .kitty, .android: (shellTop, Color(red: 0.42, green: 0.48, blue: 0.60))
+            }
+            var hand = g
+            // It comes up from below to its place beside the ear.
+            hand.translateBy(x: plan.ringX.right * u, y: (plan.ringY + (1 - pose.cup) * 14) * u)
+            func at(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * u, y: y * u) }
+            var palm = Path()
+            palm.move(to: at(-9, 17))
+            palm.addQuadCurve(to: at(5, -21), control: at(13, 6))
+            palm.addQuadCurve(to: at(-8, -3), control: at(-5, -15))
+            palm.closeSubpath()
+            hand.fill(palm, with: .color(fill.opacity(pose.cup)))
+            hand.stroke(palm, with: .color(edge.opacity(pose.cup)), style: StrokeStyle(lineWidth: 1.5 * u, lineJoin: .round))
+            // Two fingers, or feathers.
+            for (from, to) in [(at(1.5, -15), at(-2.5, -7)), (at(5, -8), at(0.5, -1))] {
+                hand.stroke(Path { p in p.move(to: from); p.addLine(to: to) }, with: .color(edge.opacity(pose.cup * 0.8)),
+                            style: StrokeStyle(lineWidth: 1.2 * u, lineCap: .round))
+            }
+        }
+
         // A sparkle in each open eye.
         let sparkle = (1 - pose.closed) * min(1, max(0, (open - 0.5) * 2))
         for base in eyes {

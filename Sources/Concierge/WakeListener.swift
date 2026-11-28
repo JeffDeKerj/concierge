@@ -16,9 +16,13 @@ private let log = Logger(subsystem: "local.jeffdekerj.concierge", category: "wak
 final class WakeListener {
     private let conversation: Conversation
     private let io: VoiceIO
+    /// Told when the microphone sends nothing, so the face can show it.
+    private let hearing: Hearing
     /// Whether this listener keeps the audio engine running.
     private var holding = false
     private var nextTry = Date.distantPast
+    /// Since when the engine has refused to start.
+    private var engineDownSince: Date?
     /// The name it listens for.
     private let name = Brand.name
     /// The language it listens in, and whether the words after the name are
@@ -36,9 +40,10 @@ final class WakeListener {
     /// Set when the wake word was heard: what followed it so far, and when it last changed.
     private var pending: (words: String, changed: Date)?
 
-    init(conversation: Conversation, io: VoiceIO) {
+    init(conversation: Conversation, io: VoiceIO, hearing: Hearing) {
         self.conversation = conversation
         self.io = io
+        self.hearing = hearing
     }
 
     /// Watches the settings and the conversation, and keeps the listener
@@ -95,14 +100,25 @@ final class WakeListener {
             do {
                 try io.hold(.wake)
                 holding = true
+                engineDownSince = nil
+                if hearing.problem == .noMicrophone { hearing.set(nil) }
             } catch {
                 log.error("wake: engine did not start: \(error.localizedDescription, privacy: .public)")
                 nextTry = Date().addingTimeInterval(15)
+                let since = engineDownSince ?? Date()
+                engineDownSince = since
+                if Date().timeIntervalSince(since) >= 60 { hearing.set(.noMicrophone) }
             }
         }
         if !on, holding {
             io.release(.wake)
             holding = false
+        }
+        if !on {
+            // Not asked to listen: nothing to be deaf to.
+            engineDownSince = nil
+            _ = silence.forget()
+            hearing.set(nil)
         }
     }
 
@@ -189,21 +205,20 @@ final class WakeListener {
         }
     }
 
-    /// How many 5-second looks in a row found a microphone that sends nothing at all.
-    private var silentLooks = 0
+    private var silence = SilenceWatch()
 
-    /// A microphone that sends pure silence is not a quiet room: it is a
-    /// headset that is switched off or muted while still being the Mac's
-    /// input. Nestor then hears nothing, so say so once in the kept log.
+    /// Says once in the kept log, and to the face, that the microphone has
+    /// sent nothing at all for a minute, and again when sound is back.
     private func noteSilence(_ silent: Bool) {
-        if silent {
-            silentLooks += 1
-            if silentLooks == 12 {
-                log.notice("wake: \(self.io.microphoneName, privacy: .public) has sent only silence for a minute; \(Brand.name, privacy: .public) cannot hear")
-            }
-        } else {
-            if silentLooks >= 12 { log.notice("wake: \(self.io.microphoneName, privacy: .public) sends sound again") }
-            silentLooks = 0
+        switch silence.look(silent: silent) {
+        case .deaf:
+            log.notice("wake: \(self.io.microphoneName, privacy: .public) has sent only silence for a minute; \(Brand.name, privacy: .public) cannot hear")
+            hearing.set(.silent(microphone: io.microphoneName))
+        case .hearsAgain:
+            log.notice("wake: \(self.io.microphoneName, privacy: .public) sends sound again")
+            hearing.set(nil)
+        case nil:
+            break
         }
     }
 
