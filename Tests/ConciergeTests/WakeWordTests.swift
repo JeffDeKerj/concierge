@@ -32,6 +32,10 @@ struct WakeWordTests {
         // "Hey Nestor": after "hey", two letters off still counts.
         #expect(CalledName.after("Hey Hastor, what's on tomorrow", name: "Nestor") == "what's on tomorrow")
         #expect(CalledName.after("hey nestar", name: "Nestor") == "")
+        // Said without the h, as French speakers do.
+        #expect(CalledName.after("Ey Hastor, what's on", name: "Nestor") == "what's on")
+        #expect(CalledName.after("Eh, Hastor", name: "Nestor") == "")
+        #expect(CalledName.after("a pastor called", name: "Nestor") == nil)
         #expect(CalledName.after("hey Emma, are you coming", name: "Nestor") == nil)
         #expect(CalledName.after("hey Peter", name: "Nestor") == nil)
         #expect(CalledName.after("hey mister", name: "Nestor") == nil)

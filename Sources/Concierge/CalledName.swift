@@ -21,6 +21,11 @@ enum CalledName {
         return wanted.count >= 5 && distance(heard, wanted) <= 1
     }
 
+    /// What may come before the name in a call: "hey", and how the
+    /// recogniser writes it without the h, as a French speaker says it ("ey").
+    /// Not "a": "a pastor" would wake it.
+    static let callWords: Set<String> = ["hey", "hay", "ey", "eh", "ay", "hi", "hej"]
+
     /// Two letters off at most, for a name of five letters or more.
     private static func close(_ word: String, name: String) -> Bool {
         let wanted = letters(name)
@@ -42,7 +47,7 @@ enum CalledName {
         for (i, word) in words.enumerated() {
             if matches(word.text, name: name) {
                 last = word.range.upperBound
-            } else if i > 0, letters(words[i - 1].text) == Array("hey"), close(word.text, name: name) {
+            } else if i > 0, callWords.contains(String(letters(words[i - 1].text))), close(word.text, name: name) {
                 // "Hey Nestor": after "hey", a name two letters off still counts.
                 last = word.range.upperBound
             } else if i + 1 < words.count, matches(word.text + words[i + 1].text, name: name) {
