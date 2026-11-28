@@ -68,6 +68,7 @@ enum AskContext {
             + "each paper's DOI, code and project links are there. To read a paper, start from those "
             + "links before searching the web.")
         parts.append(Self.brain)
+        parts.append(Self.sessionsNote)
         if finance { parts.append(Self.financeNote + "\n" + Self.financeFiles()) }
         return parts.joined(separator: "\n\n") + "\n\nThe question: "
     }
@@ -84,6 +85,13 @@ enum AskContext {
     static let brain = "For anything beyond today's page, search the owner's memory before answering: "
         + "the recall-personal tools cover their Obsidian notes (paper notes, digests, work summaries), "
         + "and the recall tools cover their projects' notes and decisions. Search, then read the best hit."
+
+    /// The owner's code sessions, through a read-only summary script.
+    static var sessionsNote: String {
+        "To see what the owner's Claude Code sessions are doing (which are working, which wait for them, "
+            + "what each last said), run exactly: /usr/bin/python3 -I \(Paths.project.path)/Scripts/sessions.py "
+            + "(add a number of hours to look further back; 3 by default). It is read only."
+    }
 
     /// For Claude only: where the owner's finance notes are.
     static let financeNote = "For money questions, this comes before the memory search above: look in the owner's finance folder, "

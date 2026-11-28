@@ -73,7 +73,8 @@
       "WebFetch(domain:api.crossref.org)",
       "WebFetch(domain:api.openalex.org)",
       "WebFetch(domain:digital-chemistry.io)",
-      "WebFetch(domain:www.digital-chemistry.io)"
+      "WebFetch(domain:www.digital-chemistry.io)",
+      "Bash(/usr/bin/python3 -I /Users/jeffdekerj/code/swift/concierge/Scripts/sessions.py:*)"
     ],
     "additionalDirectories": [
       "/Users/jeffdekerj/obsidian/Biochem Data Extraction/digests"
