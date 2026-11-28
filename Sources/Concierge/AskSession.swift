@@ -65,6 +65,7 @@ enum AskContext {
         parts.append("The papers on the page come from the daily digests in \(Self.digests): "
             + "each paper's DOI, code and project links are there. To read a paper, start from those "
             + "links before searching the web.")
+        parts.append(Self.brain)
         return parts.joined(separator: "\n\n") + "\n\nThe question: "
     }
 
@@ -76,6 +77,11 @@ enum AskContext {
     }
 
     /// A page's words without its markup, one block per line.
+    /// The owner's searchable memory (the brain project), read only. Finance stays out of it.
+    static let brain = "For anything beyond today's page, search the owner's memory before answering: "
+        + "the recall-personal tools cover their Obsidian notes (paper notes, digests, work summaries), "
+        + "and the recall tools cover their projects' notes and decisions. Search, then read the best hit."
+
     /// The Obsidian folder the papers section is written from.
     static let digests = NSHomeDirectory() + "/obsidian/Biochem Data Extraction/digests"
 

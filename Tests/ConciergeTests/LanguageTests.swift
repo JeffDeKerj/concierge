@@ -199,6 +199,8 @@ struct PageAsTextTests {
     @Test func theModelIsToldWhereThePapersLinksAre() {
         let opening = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")
         #expect(opening.contains(AskContext.digests))
+        // And that the owner's memory can be searched.
+        #expect(opening.contains("recall-personal"))
     }
 }
 

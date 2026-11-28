@@ -39,6 +39,11 @@ Settled facts about how the app works. Traps are in [sharp-edges.md](sharp-edges
   reads mail and chats: an open fetch would let a crafted message send
   private data to any site. ChemRxiv refuses automated readers, so for
   those papers Nestor falls back to the abstract and the code.
+  Since 2026-11-28 also the brain project's personal search
+  (`mcp__recall-personal__search`/`get`: the Obsidian notes, paper notes,
+  digests, work summaries), read only, next to the code search it already
+  had. The question opening (`AskContext.brain`) tells it to search there for
+  anything beyond today's page. The finance search stays out.
 - **Refresh** (`AppModel.refresh`): the backend's refresh command with the
   project folder as working directory (`claude -p "/briefing" --output-format json`). A watcher checks the file's modification time
   every two seconds and reloads on change; one more check runs after exit. A
