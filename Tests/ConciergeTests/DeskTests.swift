@@ -46,6 +46,19 @@ struct DeskTalkTests {
                 == .text("Use the cheaper model and run it again"))
     }
 
+    @Test func againRepeatsInsteadOfAnswering() {
+        #expect(DeskTalk.interpret("Ask again", options: ["Red", "Blue"]) == .again)
+        #expect(DeskTalk.interpret("repeat that", options: []) == .again)
+        #expect(DeskTalk.confirm("Ask again") == .again)
+        #expect(DeskTalk.confirm("Pardon?") == .again)
+    }
+
+    @Test func manyWaysOfSayingYes() {
+        for yes in ["Yup", "Absolutely", "Yes please", "Confirm", "That's right", "Go", "Perfect", "C'est ça"] {
+            #expect(DeskTalk.confirm(yes) == .yes, "\(yes)")
+        }
+    }
+
     @Test func onlyAClearYesSends() {
         #expect(DeskTalk.confirm("Yes, send it") == .yes)
         #expect(DeskTalk.confirm("oui") == .yes)

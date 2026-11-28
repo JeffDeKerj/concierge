@@ -10,9 +10,19 @@ enum DeskTalk {
         case text(String)
         /// Leave this one for later.
         case skip
+        /// Say the question again.
+        case again
     }
 
-    enum Confirm: Equatable { case yes, no }
+    enum Confirm: Equatable { case yes, no, again }
+
+    /// "Again", "repeat", "pardon": say it once more.
+    static func wantsAgain(_ heard: String) -> Bool {
+        let words = plain(heard)
+        guard words.split(separator: " ").count <= 5 else { return false }
+        return ["again", "repeat", "pardon", "say that", "what was", "come again", "sorry", "repete", "encore", "quoi", "comment"]
+            .contains { words.contains($0) } || words == "what"
+    }
 
     enum AwayCommand: Equatable { case away, back }
 
@@ -82,6 +92,7 @@ enum DeskTalk {
     static func interpret(_ heard: String, options: [String], multiSelect: Bool = false) -> Reply {
         let words = plain(heard)
         let tokens = words.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        if wantsAgain(heard) { return .again }
         if ["skip", "next", "later", "not now", "pass", "passe", "plus tard", "suivant"].contains(where: { words == $0 || words.hasPrefix($0 + " ") }) {
             return .skip
         }
@@ -103,9 +114,12 @@ enum DeskTalk {
 
     static func confirm(_ heard: String) -> Confirm? {
         let words = plain(heard)
-        let no = ["no", "nope", "don't", "do not", "cancel", "wait", "stop", "non", "annule", "attends"]
-        let yes = ["yes", "yeah", "yep", "send", "go ahead", "do it", "correct", "right", "sure", "okay", "ok",
-                   "oui", "vas y", "envoie", "d'accord", "ouais"]
+        if wantsAgain(heard) { return .again }
+        let no = ["no", "nope", "don't", "do not", "cancel", "wait", "stop", "non", "annule", "attends", "pas"]
+        let yes = ["yes", "yeah", "yep", "yup", "yah", "ya", "yes please", "please", "send", "go", "go ahead", "do it",
+                   "correct", "right", "that's right", "sure", "okay", "ok", "absolutely", "confirm", "confirmed",
+                   "indeed", "affirmative", "fine", "perfect", "good", "oui", "vas y", "envoie", "d'accord", "ouais",
+                   "c'est ca", "exactement", "parfait"]
         if no.contains(where: { words == $0 || words.hasPrefix($0 + " ") || words.hasPrefix($0 + ",") }) { return .no }
         if yes.contains(where: { words == $0 || words.hasPrefix($0 + " ") || words.hasPrefix($0 + ",") || words.contains(" " + $0) }) {
             return .yes

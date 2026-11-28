@@ -268,14 +268,20 @@ final class Conversation {
             var choices: [String: String] = [:]
             var reply = ""
             for (index, part) in question.parts.enumerated() {
-                await speak(DeskTalk.readOut(question, part: index), settings, in: .english)
-                guard let heard = await io.listen(waitForSpeech: 15) else {
-                    guard !Task.isCancelled else { return false }
-                    await speak("I'll leave it in its window.", settings, in: .english)
-                    return true
+                var understood: DeskTalk.Reply = .again
+                for _ in 0..<3 where understood == .again {
+                    await speak(DeskTalk.readOut(question, part: index), settings, in: .english)
+                    guard let heard = await io.listen(waitForSpeech: 15) else {
+                        guard !Task.isCancelled else { return false }
+                        await speak("I'll leave it in its window.", settings, in: .english)
+                        return true
+                    }
+                    understood = DeskTalk.interpret(CalledName.removed(from: heard, name: Brand.name),
+                                                    options: part.options, multiSelect: part.multiSelect)
                 }
-                switch DeskTalk.interpret(CalledName.removed(from: heard, name: Brand.name),
-                                          options: part.options, multiSelect: part.multiSelect) {
+                switch understood {
+                case .again:
+                    reply = ""; choices = [:]
                 case .skip:
                     reply = ""; choices = [:]
                 case .choice(let labels):
@@ -302,15 +308,22 @@ final class Conversation {
         return true
     }
 
-    /// Asks for a yes, once more if the reply was unclear.
+    /// Asks for a yes: says it again on "again", asks "yes or no" when
+    /// unclear, three tries in all, and says so when it gives up.
     private func confirmed(_ question: String, _ settings: ConciergeSettings) async -> Bool {
         await speak(question, settings, in: .english)
-        for _ in 0..<2 {
+        for attempt in 0..<3 {
             guard let heard = await io.listen(waitForSpeech: 12) else { return false }
-            if let answer = DeskTalk.confirm(CalledName.removed(from: heard, name: Brand.name)) { return answer == .yes }
-            await speak("Yes or no?", settings, in: .english)
+            let answer = DeskTalk.confirm(CalledName.removed(from: heard, name: Brand.name))
+            log.notice("desk confirm: \(answer.map { "\($0)" } ?? "unclear", privacy: .public)")
+            switch answer {
+            case .yes: return true
+            case .no: return false
+            case .again: await speak(question, settings, in: .english)
+            case nil: if attempt < 2 { await speak("Sorry, I didn't catch that. Shall I send it, yes or no?", settings, in: .english) }
+            }
         }
-        return false
+        return false  // the caller says "Okay, not sent."
     }
 
     /// Says something the owner may talk over, when Settings allows that.
