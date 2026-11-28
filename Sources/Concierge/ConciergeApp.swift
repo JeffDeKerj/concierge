@@ -30,6 +30,11 @@ struct ConciergeApp: App {
         let wake = WakeListener(conversation: conversation, io: io, hearing: hearing)
         _wake = State(initialValue: wake)
         wake.run()
+        // Sessions' questions while the owner is away (the desk hook in ~/.claude/hooks).
+        let desk = Desk()
+        conversation.desk = desk
+        desk.onQuestion = { _ in conversation.sessionAsked() }
+        desk.run()
         let face = FacePanel(conversation: conversation)
         _face = State(initialValue: face)
         face.run()

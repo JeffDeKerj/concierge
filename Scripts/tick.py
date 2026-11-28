@@ -115,7 +115,9 @@ def run(kind: str, prompt: str, model: str) -> None:
         out = subprocess.run([CLAUDE, "-p", prompt, "--output-format", "json", "--model", model,
                               # Unsaved, so the app's question box keeps resuming its own conversation.
                               "--no-session-persistence"],
-                             cwd=ROOT, capture_output=True, text=True, timeout=1200)
+                             cwd=ROOT, capture_output=True, text=True, timeout=1200,
+                             # Nestor's own run: the desk hook leaves it alone.
+                             env={**os.environ, "NESTOR_RUN": "1"})
         report = json.loads(out.stdout or "{}")
     except (subprocess.SubprocessError, ValueError, OSError) as exc:
         report = {"is_error": True, "result": str(exc)}

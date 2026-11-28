@@ -40,6 +40,9 @@ final class Conversation {
     /// mid-conversation without a word; now it says so and how to go on.
     static let maxTurns = 25
 
+    /// The sessions' questions and the away switch; set by the app.
+    var desk: Desk?
+
     /// `io` is shared with the wake-word listener, so both use one microphone session.
     init(model: AppModel, io: VoiceIO? = nil) {
         self.model = model
@@ -60,6 +63,13 @@ final class Conversation {
         loop = Task {
             await run(opening: opening, greet: greet, context: context, quickReply: quickReply, firstQuestion: firstQuestion)
         }
+    }
+
+    /// A session's question came in while the owner is away: read it out
+    /// now, or at the next turn of a conversation already going on.
+    func sessionAsked() {
+        guard !isActive else { return }
+        start(quickReply: true)
     }
 
     /// An alert from the job runner: say it, then listen for a reply when
@@ -115,6 +125,10 @@ final class Conversation {
         var context = context
         for turn in 0..<Self.maxTurns {
             guard !Task.isCancelled else { return }
+            // Sessions' questions that came in while away are read out first.
+            if let desk, desk.away, !desk.unannounced.isEmpty {
+                guard await readQuestions(desk.unannounced, settings, in: language) else { return }
+            }
             state = .listening(io.heard)
             // After an alert, only a short wait: the owner may be busy.
             let heard = (turn == 0 && firstQuestion != nil)
@@ -138,6 +152,23 @@ final class Conversation {
                     await speak(wanted.switched, settings, in: wanted)
                 } catch {
                     await speak(Language.frenchMissing, settings, in: .english)
+                }
+                continue
+            }
+            if let desk, let command = DeskTalk.awayCommand(said) {
+                log.notice("turn \(turn, privacy: .public): away switch \(command == .away ? "on" : "off", privacy: .public)")
+                await desk.setAway(command == .away)
+                await speak(command == .away
+                    ? "Okay. While you're away, I'll read your sessions' questions to you."
+                    : "Welcome back. Your sessions will ask you in their windows again.", settings, in: .english)
+                continue
+            }
+            if let desk, DeskTalk.asksForQuestions(said) {
+                if desk.waiting.isEmpty {
+                    await speak(desk.away ? "No session is waiting for you." : "No session is waiting. They only wait for me while you're away.",
+                                settings, in: .english)
+                } else {
+                    guard await readQuestions(desk.waiting, settings, in: language) else { return }
                 }
                 continue
             }
@@ -225,6 +256,61 @@ final class Conversation {
         }
         // The limit: say so, and how to go on, rather than vanish.
         await sayAndEnd(language.limitReached, settings, in: language)
+    }
+
+    /// Reads each question out, takes the owner's pick, says it back, and
+    /// sends it only on a yes. False when the conversation was stopped.
+    private func readQuestions(_ questions: [DeskQuestion], _ settings: ConciergeSettings, in language: Language) async -> Bool {
+        guard let desk else { return true }
+        for question in questions {
+            desk.markAnnounced(question.id)
+            guard desk.waiting.contains(where: { $0.id == question.id }) else { continue }
+            var choices: [String: String] = [:]
+            var reply = ""
+            for (index, part) in question.parts.enumerated() {
+                await speak(DeskTalk.readOut(question, part: index), settings, in: .english)
+                guard let heard = await io.listen(waitForSpeech: 15) else {
+                    guard !Task.isCancelled else { return false }
+                    await speak("I'll leave it in its window.", settings, in: .english)
+                    return true
+                }
+                switch DeskTalk.interpret(CalledName.removed(from: heard, name: Brand.name),
+                                          options: part.options, multiSelect: part.multiSelect) {
+                case .skip:
+                    reply = ""; choices = [:]
+                case .choice(let labels):
+                    choices[part.question] = labels.joined(separator: ", ")
+                    reply = labels.joined(separator: ", ")
+                case .text(let words):
+                    choices[part.question] = words
+                    reply = words
+                }
+                if reply.isEmpty { break }
+            }
+            guard !reply.isEmpty else { await speak("Skipped.", settings, in: .english); continue }
+            let shown = question.kind == .card ? choices.values.joined(separator: "; ") : reply
+            guard await confirmed(DeskTalk.confirmation(question, answer: shown), settings) else {
+                guard !Task.isCancelled else { return false }
+                await speak("Okay, not sent.", settings, in: .english)
+                continue
+            }
+            let sent = question.kind == .card
+                ? await desk.answer(question, choices: choices)
+                : await desk.answer(question, text: reply)
+            await speak(sent ? "Sent." : "I couldn't send it. It's still in its window.", settings, in: .english)
+        }
+        return true
+    }
+
+    /// Asks for a yes, once more if the reply was unclear.
+    private func confirmed(_ question: String, _ settings: ConciergeSettings) async -> Bool {
+        await speak(question, settings, in: .english)
+        for _ in 0..<2 {
+            guard let heard = await io.listen(waitForSpeech: 12) else { return false }
+            if let answer = DeskTalk.confirm(CalledName.removed(from: heard, name: Brand.name)) { return answer == .yes }
+            await speak("Yes or no?", settings, in: .english)
+        }
+        return false
     }
 
     /// Says something the owner may talk over, when Settings allows that.

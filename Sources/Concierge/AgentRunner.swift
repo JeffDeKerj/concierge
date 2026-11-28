@@ -49,6 +49,8 @@ final class AgentRunner {
             "/bin",
         ].joined(separator: ":")
         env["PATH"] = env["PATH"].map { "\(extraPath):\($0)" } ?? extraPath
+        // Nestor's own run: the desk hook (answering sessions by voice) leaves it alone.
+        env["NESTOR_RUN"] = "1"
         process.environment = env
 
         let outPipe = Pipe()
