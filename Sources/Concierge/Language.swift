@@ -65,6 +65,12 @@ enum Language: String, CaseIterable, Identifiable {
             return nil
         }
     }
+    /// Said when a conversation reaches its number of questions.
+    var limitReached: String {
+        self == .french
+            ? "J'ai atteint la limite de questions pour l'instant. Appelez-moi si vous voulez continuer."
+            : "I've reached the limit of questions I can answer for now. Call my name if you want to carry on."
+    }
     /// Said when the owner has not gone on after an answer.
     var standingBy: String { self == .french ? "Je reste là si besoin." : "I'm here when you need me." }
     /// Said in the new language once it has switched.

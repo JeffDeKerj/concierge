@@ -36,9 +36,9 @@ final class Conversation {
     /// When the first words of the answer being given started to sound.
     private var firstWords: Date?
     /// The most turns in one conversation, as a guard against a runaway loop.
-    /// Only a safety stop: a conversation goes on while the owner talks. At 8
-    /// it ended mid-conversation without a word (2026-11-28).
-    private let maxTurns = 100
+    /// Questions in one conversation (owner, 2026-11-28). At 8 it ended
+    /// mid-conversation without a word; now it says so and how to go on.
+    static let maxTurns = 25
 
     /// `io` is shared with the wake-word listener, so both use one microphone session.
     init(model: AppModel, io: VoiceIO? = nil) {
@@ -113,7 +113,7 @@ final class Conversation {
             await speak(language.yes, settings, in: language)
         }
         var context = context
-        for turn in 0..<maxTurns {
+        for turn in 0..<Self.maxTurns {
             guard !Task.isCancelled else { return }
             state = .listening(io.heard)
             // After an alert, only a short wait: the owner may be busy.
@@ -223,8 +223,8 @@ final class Conversation {
                 }
             }
         }
-        // The safety stop: say so rather than vanish.
-        await sayAndEnd(language.standingBy, settings, in: language)
+        // The limit: say so, and how to go on, rather than vanish.
+        await sayAndEnd(language.limitReached, settings, in: language)
     }
 
     /// Says something the owner may talk over, when Settings allows that.

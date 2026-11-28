@@ -90,7 +90,7 @@ struct FrenchPhraseTests {
     @Test func whatItSaysByItselfExistsInBothLanguages() {
         for language in Language.allCases {
             for phrase in [language.yes, language.hereIAm, language.okay, language.noAnswer, language.switched, language.sample,
-                           language.standingBy] + language.stillComing {
+                           language.standingBy, language.limitReached] + language.stillComing {
                 #expect(!phrase.isEmpty)
             }
         }
@@ -298,5 +298,12 @@ struct FinanceFenceTests {
         let other = AskContext.opening(pageHTML: nil, pagePath: nil, updatesJSON: "[]", briefingsPath: "/b")
         #expect(claude.contains("recall-finance"))
         #expect(!other.contains("inance"))
+    }
+}
+
+struct TurnLimitTests {
+    @Test func aConversationTakesTwentyFiveQuestionsAndSaysWhenItStops() {
+        #expect(Conversation.maxTurns == 25)
+        #expect(Language.english.limitReached.contains("Call my name"))
     }
 }
